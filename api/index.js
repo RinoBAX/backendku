@@ -15,7 +15,7 @@ const prisma = new PrismaClient();
 // Konfigurasi Variabel Lingkungan (Sangat Penting untuk Keamanan)
 // Pastikan Anda memiliki file .env dengan nilai untuk JWT_SECRET
 require('dotenv').config();
-const JWT_SECRET = process.env.JWT_SECRET || 'your-default-super-secret-key';
+const JWT_SECRET = process.env.JWT_SECRET || 'mwehehehe';
 
 
 // Middleware untuk parsing JSON body
