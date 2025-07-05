@@ -19,7 +19,7 @@ model User {
   nama             String
   email            String             @unique
   password         String
-  kodeReferral     String             @unique @default(cuid()) /// Kode unik untuk mengajak downline
+  kodeReferral     String             @unique
   statusRegistrasi RegistrationStatus @default(PENDING) /// Status registrasi oleh admin
   balance            Decimal            @default(0)
   picture          String

@@ -1,20 +1,30 @@
+// api/index.js
 
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
+const { PrismaClient, Prisma } = require('@prisma/client'); // Import Prisma
 const { Decimal } = require('@prisma/client/runtime/library');
 const multer = require('multer');
 const path = require('path');
-const bcrypt = require('bcryptjs'); 
+const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { cuid } = require('@prisma/client/runtime/library'); // Import cuid
 
+// Inisialisasi Express App dan Prisma Client
 const app = express();
 const prisma = new PrismaClient();
 
+// Konfigurasi Variabel Lingkungan
 require('dotenv').config();
 const JWT_SECRET = process.env.JWT_SECRET || 'mwehehehe';
+
+
+// Middleware untuk parsing JSON body
 app.use(express.json());
+
+// Konfigurasi Multer untuk file upload
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
+    // Di lingkungan serverless, gunakan /tmp untuk penyimpanan sementara
     cb(null, '/tmp/uploads');
   },
   filename: function (req, file, cb) {
@@ -23,23 +33,20 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage: storage });
-// Middleware untuk menyajikan file statis dari folder 'uploads'
-// Sebaiknya gunakan layanan storage pihak ketiga seperti AWS S3 atau Cloudinary.
 app.use('/uploads', express.static('/tmp/uploads'));
 
+
+// =================================================================
+// == MIDDLEWARE KEAMANAN
+// =================================================================
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1]; 
-
-    if (token == null) {
-        return res.sendStatus(401);
-    }
+    const token = authHeader && authHeader.split(' ')[1];
+    if (token == null) return res.sendStatus(401);
 
     jwt.verify(token, JWT_SECRET, (err, user) => {
-        if (err) {
-            return res.sendStatus(403); 
-        }
-        req.user = user; 
+        if (err) return res.sendStatus(403);
+        req.user = user;
         next();
     });
 };
@@ -54,6 +61,13 @@ const isAdmin = (req, res, next) => {
 };
 
 
+// =================================================================
+// == RUTE AUTENTIKASI
+// =================================================================
+
+/**
+ * Registrasi pengguna baru dengan kode referral kustom.
+ */
 app.post('/api/register', async (req, res) => {
   const { nama, email, password, picture, kodeReferralUpline } = req.body;
 
@@ -73,6 +87,27 @@ app.post('/api/register', async (req, res) => {
       }
       uplineId = upline.id;
     }
+
+    // --- LOGIKA BARU UNTUK KODE REFERRAL ---
+    let newReferralCode;
+    let isCodeUnique = false;
+    const sanitizedName = nama.replace(/[^a-zA-Z0-9]/g, '').toLowerCase().substring(0, 4);
+
+    do {
+        const randomPart = cuid().slice(-5); // Ambil 5 karakter terakhir dari cuid
+        const candidateCode = `${sanitizedName}${randomPart}`;
+
+        const codeExists = await prisma.user.findUnique({
+            where: { kodeReferral: candidateCode },
+        });
+
+        if (!codeExists) {
+            newReferralCode = candidateCode;
+            isCodeUnique = true;
+        }
+    } while (!isCodeUnique);
+    // --- AKHIR LOGIKA BARU ---
+
     const saltRounds = 10;
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
@@ -80,19 +115,23 @@ app.post('/api/register', async (req, res) => {
       data: {
         nama,
         email,
-        password: hashedPassword, 
+        password: hashedPassword,
         picture,
         uplineId: uplineId,
+        kodeReferral: newReferralCode, // Gunakan kode referral yang baru dibuat
       },
     });
 
-    res.status(201).json({ id: newUser.id, nama: newUser.nama, email: newUser.email });
+    res.status(201).json({ id: newUser.id, nama: newUser.nama, email: newUser.email, kodeReferral: newUser.kodeReferral });
   } catch (error) {
     console.error('Error saat registrasi:', error);
     res.status(500).json({ error: 'Terjadi kesalahan pada server.' });
   }
 });
 
+/**
+ * Login pengguna dan mengembalikan JWT.
+ */
 app.post('/api/login', async (req, res) => {
     const { email, password } = req.body;
 
@@ -106,13 +145,14 @@ app.post('/api/login', async (req, res) => {
         if (!isPasswordValid) {
             return res.status(401).json({ error: 'Email atau password salah.' });
         }
+        
         const userPayload = {
             id: user.id,
             email: user.email,
             role: user.role,
         };
-        const accessToken = jwt.sign(userPayload, JWT_SECRET, { expiresIn: '1d' }); 
 
+        const accessToken = jwt.sign(userPayload, JWT_SECRET, { expiresIn: '1d' });
         res.json({ accessToken });
 
     } catch (error) {
@@ -120,6 +160,11 @@ app.post('/api/login', async (req, res) => {
         res.status(500).json({ error: 'Terjadi kesalahan pada server.' });
     }
 });
+
+
+// =================================================================
+// == API ENDPOINTS (DILINDUNGI)
+// =================================================================
 
 app.get('/api/me', authenticateToken, async (req, res) => {
     try {
@@ -229,6 +274,10 @@ app.post('/api/withdrawals', authenticateToken, async (req, res) => {
 });
 
 
+// =================================================================
+// == RUTE KHUSUS ADMIN (DILINDUNGI)
+// =================================================================
+
 app.put('/api/admin/users/:id/approve', authenticateToken, isAdmin, async (req, res) => {
     const { id } = req.params;
     try {
@@ -334,12 +383,6 @@ app.put('/api/admin/withdrawals/:id/approve', authenticateToken, isAdmin, async 
         res.status(500).json({ error: error.message || 'Gagal menyetujui penarikan.' });
     }
 });
-module.exports = app;
 
-// Jalankan server local
-/*
-const PORT = process.env.PORT || 6969;
-app.listen(PORT, () => {
-  console.log(`Server berjalan di http://localhost:${PORT}`);
-});
-*/
+// Ekspor app untuk digunakan oleh Vercel
+module.exports = app;
