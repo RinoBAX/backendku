@@ -16,10 +16,10 @@ model User {
   statusRegistrasi RegistrationStatus @default(PENDING)
   balance          Decimal            @default(0)
   picture          String?
-
-  uplineId  Int?
-  upline    User?  @relation("ReferralTree", fields: [uplineId], references: [id])
-  downlines User[] @relation("ReferralTree")
+  role             Role               @default(USER) // <-- TAMBAHKAN BARIS INI
+  uplineId         Int?
+  upline           User?              @relation("ReferralTree", fields: [uplineId], references: [id])
+  downlines        User[]             @relation("ReferralTree")
 
   projectSubmissions ProjectSubmission[]
   withdrawals        Withdrawal[]
@@ -31,19 +31,20 @@ model User {
 }
 
 model Project {
-  id          Int     @id @default(autoincrement())
+  id          Int                 @id @default(autoincrement())
   namaProyek  String
   iconUrl     String
-  nilaiProyek Decimal 
+  nilaiProyek Decimal
   fields      ProjectField[]
   submissions ProjectSubmission[]
-  tglDibuat DateTime @default(now())
+  tglDibuat   DateTime            @default(now())
+
   @@map("projects")
 }
 
 model ProjectField {
   id         Int       @id @default(autoincrement())
-  namaField  String 
+  namaField  String
   tipeField  FieldType
   wajibDiisi Boolean   @default(true)
 
@@ -77,7 +78,7 @@ model ProjectSubmission {
 
 model SubmissionData {
   id    Int    @id @default(autoincrement())
-  nilai String 
+  nilai String
 
   submissionId Int
   submission   ProjectSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
@@ -99,7 +100,7 @@ model Transaction {
   submissionId Int?
   submission   ProjectSubmission? @relation(fields: [submissionId], references: [id])
 
-  withdrawalId Int?        @unique 
+  withdrawalId Int?        @unique
   withdrawal   Withdrawal? @relation(fields: [withdrawalId], references: [id])
 
   transactionDate DateTime @default(now())
@@ -149,7 +150,12 @@ enum WithdrawalStatus {
 
 enum TransactionType {
   PENGERJAAN
-  KOMISI_UPLINE1 
-  KOMISI_UPLINE2 
+  KOMISI_UPLINE1
+  KOMISI_UPLINE2
   PENARIKAN
+}
+
+enum Role {
+  USER
+  ADMIN
 }

@@ -102,7 +102,7 @@ app.post('/api/register', async (req, res) => {
 
     do {
         const randomPart = cuid().slice(-5); // Ambil 5 karakter terakhir dari cuid
-        const candidateCode = `${sanitizedName}${randomPart}`;
+        const candidateCode = sanitizedName + "_" + randomPart;
 
         const codeExists = await prisma.user.findUnique({
             where: { kodeReferral: candidateCode },
