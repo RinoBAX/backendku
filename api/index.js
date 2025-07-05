@@ -1,30 +1,19 @@
-// api/index.js
-
 const express = require('express');
-const { PrismaClient, Prisma } = require('@prisma/client'); // Import Prisma
+const { PrismaClient, Prisma } = require('@prisma/client');
 const { Decimal } = require('@prisma/client/runtime/library');
 const multer = require('multer');
 const path = require('path');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const cuid = require('cuid'); // Import dari paket 'cuid' yang sudah diinstal
-
-// Inisialisasi Express App dan Prisma Client
+const cuid = require('cuid');
 const app = express();
 const prisma = new PrismaClient();
 
-// Konfigurasi Variabel Lingkungan
 require('dotenv').config();
 const JWT_SECRET = process.env.JWT_SECRET || 'mwehehehe';
-
-
-// Middleware untuk parsing JSON body
 app.use(express.json());
-
-// Konfigurasi Multer untuk file upload
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    // Di lingkungan serverless, gunakan /tmp untuk penyimpanan sementara
     cb(null, '/tmp/uploads');
   },
   filename: function (req, file, cb) {
@@ -35,10 +24,6 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 app.use('/uploads', express.static('/tmp/uploads'));
 
-
-// =================================================================
-// == MIDDLEWARE KEAMANAN
-// =================================================================
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
@@ -59,26 +44,13 @@ const isAdmin = (req, res, next) => {
         res.status(403).json({ error: 'Akses ditolak. Hanya untuk admin.' });
     }
 };
-
-
-// =================================================================
-// == RUTE AUTENTIKASI
-// =================================================================
-
-/**
- * Registrasi pengguna baru dengan kode referral kustom.
- */
 app.post('/api/register', async (req, res) => {
   const { nama, email, password, picture, kodeReferralUpline } = req.body;
 
   try {
-    // --- PENAMBAHAN VALIDASI INPUT ---
-    // Memastikan field penting tidak kosong untuk mencegah crash
     if (!nama || !email || !password) {
       return res.status(400).json({ error: 'Nama, email, dan password wajib diisi.' });
     }
-    // --- AKHIR VALIDASI INPUT ---
-
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
       return res.status(400).json({ error: 'Email sudah terdaftar.' });
@@ -95,14 +67,13 @@ app.post('/api/register', async (req, res) => {
       uplineId = upline.id;
     }
 
-    // --- LOGIKA BARU UNTUK KODE REFERRAL ---
     let newReferralCode;
     let isCodeUnique = false;
     const sanitizedName = nama.replace(/[^a-zA-Z0-9]/g, '').toLowerCase().substring(0, 4);
 
     do {
-        const randomPart = cuid().slice(-5); // Ambil 5 karakter terakhir dari cuid
-        const candidateCode = sanitizedName + "_" + randomPart;
+        const randomPart = cuid().slice(-5); 
+        const candidateCode = `${sanitizedName}${randomPart}`;
 
         const codeExists = await prisma.user.findUnique({
             where: { kodeReferral: candidateCode },
@@ -113,7 +84,6 @@ app.post('/api/register', async (req, res) => {
             isCodeUnique = true;
         }
     } while (!isCodeUnique);
-    // --- AKHIR LOGIKA BARU ---
 
     const saltRounds = 10;
     const hashedPassword = await bcrypt.hash(password, saltRounds);
@@ -123,22 +93,22 @@ app.post('/api/register', async (req, res) => {
         nama,
         email,
         password: hashedPassword,
-        picture,
+        picture: picture || null, 
         uplineId: uplineId,
-        kodeReferral: newReferralCode, // Gunakan kode referral yang baru dibuat
+        kodeReferral: newReferralCode, 
       },
     });
 
     res.status(201).json({ id: newUser.id, nama: newUser.nama, email: newUser.email, kodeReferral: newUser.kodeReferral });
   } catch (error) {
     console.error('Error saat registrasi:', error);
+    if (error instanceof Prisma.PrismaClientValidationError) {
+        return res.status(400).json({ error: 'Input tidak valid.', details: error.message });
+    }
     res.status(500).json({ error: 'Terjadi kesalahan pada server.' });
   }
 });
 
-/**
- * Login pengguna dan mengembalikan JWT.
- */
 app.post('/api/login', async (req, res) => {
     const { email, password } = req.body;
 
@@ -168,10 +138,6 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-
-// =================================================================
-// == API ENDPOINTS (DILINDUNGI)
-// =================================================================
 
 app.get('/api/me', authenticateToken, async (req, res) => {
     try {
@@ -281,9 +247,55 @@ app.post('/api/withdrawals', authenticateToken, async (req, res) => {
 });
 
 
-// =================================================================
-// == RUTE KHUSUS ADMIN (DILINDUNGI)
-// =================================================================
+app.post('/api/admin/projects', authenticateToken, isAdmin, async (req, res) => {
+    const { namaProyek, iconUrl, nilaiProyek, fields } = req.body;
+
+    if (!namaProyek || !nilaiProyek || !fields || !Array.isArray(fields) || fields.length === 0) {
+        return res.status(400).json({ error: 'Data tidak lengkap. Pastikan namaProyek, nilaiProyek, dan array fields diisi.' });
+    }
+
+    try {
+        const newProject = await prisma.$transaction(async (tx) => {
+            const project = await tx.project.create({
+                data: {
+                    namaProyek,
+                    iconUrl: iconUrl || '', 
+                    nilaiProyek: new Decimal(nilaiProyek),
+                }
+            });
+            const fieldsToCreate = fields.map(field => {
+                if (!field.namaField || !field.tipeField) {
+                    throw new Error('Setiap field harus memiliki namaField dan tipeField.');
+                }
+                return {
+                    namaField: field.namaField,
+                    tipeField: field.tipeField,
+                    wajibDiisi: field.wajibDiisi || true,
+                    projectId: project.id, 
+                };
+            });
+
+            await tx.projectField.createMany({
+                data: fieldsToCreate,
+            });
+
+            return tx.project.findUnique({
+                where: { id: project.id },
+                include: { fields: true },
+            });
+        });
+
+        res.status(201).json(newProject);
+
+    } catch (error) {
+        console.error('Error saat membuat proyek baru:', error);
+        if (error instanceof Prisma.PrismaClientValidationError || error.message.includes('namaField')) {
+            return res.status(400).json({ error: 'Input tidak valid.', details: error.message });
+        }
+        res.status(500).json({ error: 'Gagal membuat proyek baru.' });
+    }
+});
+
 
 app.put('/api/admin/users/:id/approve', authenticateToken, isAdmin, async (req, res) => {
     const { id } = req.params;
@@ -390,10 +402,7 @@ app.put('/api/admin/withdrawals/:id/approve', authenticateToken, isAdmin, async 
         res.status(500).json({ error: error.message || 'Gagal menyetujui penarikan.' });
     }
 });
-
-// Ekspor app untuk digunakan oleh Vercel
 module.exports = app;
-
 
 // Jalankan server
 const PORT = process.env.PORT || 6969;
