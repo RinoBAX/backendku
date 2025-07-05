@@ -72,6 +72,13 @@ app.post('/api/register', async (req, res) => {
   const { nama, email, password, picture, kodeReferralUpline } = req.body;
 
   try {
+    // --- PENAMBAHAN VALIDASI INPUT ---
+    // Memastikan field penting tidak kosong untuk mencegah crash
+    if (!nama || !email || !password) {
+      return res.status(400).json({ error: 'Nama, email, dan password wajib diisi.' });
+    }
+    // --- AKHIR VALIDASI INPUT ---
+
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
       return res.status(400).json({ error: 'Email sudah terdaftar.' });
