@@ -1,0 +1,174 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// 1. Konfigurasi datasource dan generator
+datasource db {
+  provider = "postgresql" // atau "mysql", "sqlite", "sqlserver"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// 2. Definisi Model (Tabel)
+
+/// Tabel untuk menyimpan data pengguna (PENGGUNA)
+model User {
+  id                 Int      @id @default(autoincrement())
+  nama               String
+  email              String   @unique
+  password           String
+  kodeReferral       String   @unique @default(cuid()) /// Kode unik untuk mengajak downline
+  statusRegistrasi   RegistrationStatus @default(PENDING) /// Status registrasi oleh admin
+  saldo              Decimal  @default(0)
+
+  // Relasi self-referencing untuk struktur upline-downline
+  uplineId           Int?
+  upline             User?    @relation("ReferralTree", fields: [uplineId], references: [id])
+  downlines          User[]   @relation("ReferralTree")
+
+  projectSubmissions ProjectSubmission[]
+  withdrawals        Withdrawal[]
+  transactions       Transaction[]
+
+  tglDibuat          DateTime @default(now())
+
+  @@map("users")
+}
+
+/// Tabel untuk menyimpan data proyek (PROYEK)
+model Project {
+  id                 Int      @id @default(autoincrement())
+  namaProyek         String
+  iconUrl            String
+  nilaiProyek        Decimal  /// Nilai yang didapat pengerja
+
+  fields             ProjectField[]
+  submissions        ProjectSubmission[]
+
+  tglDibuat          DateTime @default(now())
+
+  @@map("projects")
+}
+
+/// Tabel untuk field dinamis setiap proyek (PROYEK_FIELD)
+model ProjectField {
+  id                 Int      @id @default(autoincrement())
+  namaField          String   /// Contoh: "Foto KTP"
+  tipeField          FieldType
+  wajibDiisi         Boolean  @default(true)
+
+  projectId          Int
+  project            Project  @relation(fields: [projectId], references: [id])
+
+  dataEntries        SubmissionData[]
+
+  @@map("project_fields")
+}
+
+/// Tabel untuk pengerjaan proyek oleh pengguna (PROYEK_SELESAI)
+model ProjectSubmission {
+  id                 Int      @id @default(autoincrement())
+  status             SubmissionStatus @default(PENDING)
+  catatanAdmin       String?
+
+  penggunaId         Int
+  user               User     @relation(fields: [penggunaId], references: [id])
+
+  proyekId           Int
+  project            Project  @relation(fields: [proyekId], references: [id])
+
+  dataEntries        SubmissionData[]
+  transactions       Transaction[]
+
+  tglDikirim         DateTime @default(now())
+  tglDiproses        DateTime?
+
+  @@map("project_submissions")
+}
+
+/// Tabel untuk data yang diisi pengguna per field (DATA_ISIAN)
+model SubmissionData {
+  id                 Int      @id @default(autoincrement())
+  nilai              String   /// Isi field (teks atau URL file/gambar)
+
+  pengerjaanId       Int
+  submission         ProjectSubmission @relation(fields: [pengerjaanId], references: [id], onDelete: Cascade)
+
+  fieldId            Int
+  field              ProjectField      @relation(fields: [fieldId], references: [id])
+
+  @@map("submission_data")
+}
+
+/// Tabel untuk semua riwayat transaksi keuangan (TRANSAKSI)
+model Transaction {
+  id                 Int      @id @default(autoincrement())
+  tipe               TransactionType
+  jumlah             Decimal
+  
+  penggunaId         Int
+  user               User     @relation(fields: [penggunaId], references: [id])
+
+  pengerjaanId       Int?
+  submission         ProjectSubmission? @relation(fields: [pengerjaanId], references: [id])
+
+  penarikanId        Int?     @unique // Satu penarikan hanya menghasilkan satu transaksi
+  withdrawal         Withdrawal?        @relation(fields: [penarikanId], references: [id])
+  
+  tglTransaksi       DateTime @default(now())
+
+  @@map("transactions")
+}
+
+/// Tabel untuk permintaan penarikan dana (PENARIKAN)
+model Withdrawal {
+  id                 Int      @id @default(autoincrement())
+  jumlahPenarikan    Decimal
+  status             WithdrawalStatus @default(PENDING)
+
+  penggunaId         Int
+  user               User     @relation(fields: [penggunaId], references: [id])
+
+  transaction        Transaction?
+
+  tglDiajukan        DateTime @default(now())
+  tglDiproses        DateTime?
+
+  @@map("withdrawals")
+}
+
+
+// 3. Definisi Enum (Tipe data kustom)
+
+enum RegistrationStatus {
+  PENDING
+  APPROVED
+}
+
+enum FieldType {
+  TEXT
+  TEXTAREA
+  IMAGE
+  FILE
+}
+
+enum SubmissionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum WithdrawalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum TransactionType {
+  PENGERJAAN      // Untuk pengerja utama
+  KOMISI_UPLINE1  // Komisi 10% untuk upline L1
+  KOMISI_UPLINE2  // Komisi 1% untuk upline L2
+  PENARIKAN       // Pengurangan saldo saat withdraw
+}
