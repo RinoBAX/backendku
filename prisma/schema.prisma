@@ -21,7 +21,7 @@ model User {
   password         String
   kodeReferral     String             @unique
   statusRegistrasi RegistrationStatus @default(PENDING) /// Status registrasi oleh admin
-  balance            Decimal            @default(0)
+  balance          Decimal            @default(0)
   picture          String
 
   // Relasi self-referencing untuk struktur upline-downline
@@ -70,15 +70,15 @@ model ProjectField {
 
 /// Tabel untuk pengerjaan proyek oleh pengguna (PROYEK_SELESAI)
 model ProjectSubmission {
-  id           Int              @id @default(autoincrement())
-  status       SubmissionStatus @default(PENDING)
+  id        Int              @id @default(autoincrement())
+  status    SubmissionStatus @default(PENDING)
   noteAdmin String?
 
   userId Int
-  user       User @relation(fields: [userId], references: [id])
+  user   User @relation(fields: [userId], references: [id])
 
   projectId Int
-  project  Project @relation(fields: [projectId], references: [id])
+  project   Project @relation(fields: [projectId], references: [id])
 
   dataEntries  SubmissionData[]
   transactions Transaction[]
@@ -110,13 +110,13 @@ model Transaction {
   jumlah Decimal
 
   userId Int
-  user       User @relation(fields: [userId], references: [id])
+  user   User @relation(fields: [userId], references: [id])
 
   submissionId Int?
   submission   ProjectSubmission? @relation(fields: [submissionId], references: [id])
 
   withdrawalId Int?        @unique // Satu penarikan hanya menghasilkan satu transaksi
-  withdrawal  Withdrawal? @relation(fields: [withdrawalId], references: [id])
+  withdrawal   Withdrawal? @relation(fields: [withdrawalId], references: [id])
 
   transactionDate DateTime @default(now())
 
@@ -130,7 +130,7 @@ model Withdrawal {
   status          WithdrawalStatus @default(PENDING)
 
   userId Int
-  user       User @relation(fields: [userId], references: [id])
+  user   User @relation(fields: [userId], references: [id])
 
   transaction Transaction?
 
