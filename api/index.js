@@ -1,30 +1,20 @@
-// api/index.js
 
 const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const { Decimal } = require('@prisma/client/runtime/library');
 const multer = require('multer');
 const path = require('path');
-const bcrypt = require('bcryptjs'); // Menggunakan bcryptjs sesuai package.json
+const bcrypt = require('bcryptjs'); 
 const jwt = require('jsonwebtoken');
 
-// Inisialisasi Express App dan Prisma Client
 const app = express();
 const prisma = new PrismaClient();
 
-// Konfigurasi Variabel Lingkungan (Sangat Penting untuk Keamanan)
-// Pastikan Anda memiliki file .env dengan nilai untuk JWT_SECRET
 require('dotenv').config();
 const JWT_SECRET = process.env.JWT_SECRET || 'mwehehehe';
-
-
-// Middleware untuk parsing JSON body
 app.use(express.json());
-
-// Konfigurasi Multer untuk file upload
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    // Di lingkungan serverless, gunakan /tmp untuk penyimpanan sementara
     cb(null, '/tmp/uploads');
   },
   filename: function (req, file, cb) {
@@ -33,43 +23,27 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage: storage });
-
 // Middleware untuk menyajikan file statis dari folder 'uploads'
-// Ini mungkin tidak bekerja seperti yang diharapkan di lingkungan serverless tanpa konfigurasi tambahan.
 // Sebaiknya gunakan layanan storage pihak ketiga seperti AWS S3 atau Cloudinary.
 app.use('/uploads', express.static('/tmp/uploads'));
 
-
-// =================================================================
-// == MIDDLEWARE KEAMANAN
-// =================================================================
-
-/**
- * Middleware untuk memverifikasi JWT (JSON Web Token).
- * Melindungi rute yang memerlukan autentikasi.
- */
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+    const token = authHeader && authHeader.split(' ')[1]; 
 
     if (token == null) {
-        return res.sendStatus(401); // Unauthorized
+        return res.sendStatus(401);
     }
 
     jwt.verify(token, JWT_SECRET, (err, user) => {
         if (err) {
-            return res.sendStatus(403); // Forbidden, token tidak valid
+            return res.sendStatus(403); 
         }
-        req.user = user; // Menyimpan payload token (misal: { id, email, role }) ke request
+        req.user = user; 
         next();
     });
 };
 
-/**
- * Middleware untuk memverifikasi peran Admin.
- * Harus digunakan SETELAH authenticateToken.
- * CATATAN: Pastikan model User di schema.prisma Anda memiliki field `role` (misal: `role Role @default(USER)` dengan enum `enum Role { USER ADMIN }`)
- */
 const isAdmin = (req, res, next) => {
     if (req.user && req.user.role === 'ADMIN') {
         console.log("Akses admin dikonfirmasi untuk:", req.user.email);
@@ -80,13 +54,6 @@ const isAdmin = (req, res, next) => {
 };
 
 
-// =================================================================
-// == RUTE AUTENTIKASI
-// =================================================================
-
-/**
- * Registrasi pengguna baru dengan password hashing.
- */
 app.post('/api/register', async (req, res) => {
   const { nama, email, password, picture, kodeReferralUpline } = req.body;
 
@@ -106,8 +73,6 @@ app.post('/api/register', async (req, res) => {
       }
       uplineId = upline.id;
     }
-
-    // Hash password menggunakan bcrypt
     const saltRounds = 10;
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
@@ -115,7 +80,7 @@ app.post('/api/register', async (req, res) => {
       data: {
         nama,
         email,
-        password: hashedPassword, // Simpan password yang sudah di-hash
+        password: hashedPassword, 
         picture,
         uplineId: uplineId,
       },
@@ -128,9 +93,6 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-/**
- * Login pengguna dan mengembalikan JWT.
- */
 app.post('/api/login', async (req, res) => {
     const { email, password } = req.body;
 
@@ -140,21 +102,16 @@ app.post('/api/login', async (req, res) => {
             return res.status(401).json({ error: 'Email atau password salah.' });
         }
 
-        // Bandingkan password yang diberikan dengan hash di database
         const isPasswordValid = await bcrypt.compare(password, user.password);
         if (!isPasswordValid) {
             return res.status(401).json({ error: 'Email atau password salah.' });
         }
-        
-        // Jangan sertakan password dalam token
         const userPayload = {
             id: user.id,
             email: user.email,
-            role: user.role, // Pastikan field 'role' ada di model User Anda
+            role: user.role,
         };
-
-        // Buat token JWT
-        const accessToken = jwt.sign(userPayload, JWT_SECRET, { expiresIn: '1d' }); // Token berlaku 1 hari
+        const accessToken = jwt.sign(userPayload, JWT_SECRET, { expiresIn: '1d' }); 
 
         res.json({ accessToken });
 
@@ -164,14 +121,6 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-
-// =================================================================
-// == API ENDPOINTS (DILINDUNGI)
-// =================================================================
-
-/**
- * Mendapatkan detail pengguna yang sedang login.
- */
 app.get('/api/me', authenticateToken, async (req, res) => {
     try {
         const user = await prisma.user.findUnique({
@@ -185,16 +134,12 @@ app.get('/api/me', authenticateToken, async (req, res) => {
         if (!user) {
             return res.status(404).json({ error: 'User tidak ditemukan.' });
         }
-        // Hapus password dari objek respons
         const { password, ...userData } = user;
         res.json(userData);
     } catch (error) {
         res.status(500).json({ error: 'Terjadi kesalahan pada server.' });
     }
 });
-
-
-// --- RUTE PROYEK (DILINDUNGI) ---
 
 app.get('/api/projects', authenticateToken, async (req, res) => {
     try {
@@ -211,7 +156,7 @@ app.get('/api/projects', authenticateToken, async (req, res) => {
 
 app.post('/api/projects/:projectId/submit', authenticateToken, upload.any(), async (req, res) => {
     const { projectId } = req.params;
-    const userId = req.user.id; // Ambil userId dari token yang sudah diautentikasi
+    const userId = req.user.id;
 
     try {
         const submission = await prisma.$transaction(async (tx) => {
@@ -256,12 +201,9 @@ app.post('/api/projects/:projectId/submit', authenticateToken, upload.any(), asy
     }
 });
 
-
-// --- RUTE PENARIKAN (DILINDUNGI) ---
-
 app.post('/api/withdrawals', authenticateToken, async (req, res) => {
     const { totalWithdrawal } = req.body;
-    const userId = req.user.id; // Ambil userId dari token
+    const userId = req.user.id;
 
     try {
         const user = await prisma.user.findUnique({ where: { id: userId }});
@@ -286,10 +228,6 @@ app.post('/api/withdrawals', authenticateToken, async (req, res) => {
     }
 });
 
-
-// =================================================================
-// == RUTE KHUSUS ADMIN (DILINDUNGI)
-// =================================================================
 
 app.put('/api/admin/users/:id/approve', authenticateToken, isAdmin, async (req, res) => {
     const { id } = req.params;
@@ -396,12 +334,12 @@ app.put('/api/admin/withdrawals/:id/approve', authenticateToken, isAdmin, async 
         res.status(500).json({ error: error.message || 'Gagal menyetujui penarikan.' });
     }
 });
-
-// Ekspor app untuk digunakan oleh Vercel
 module.exports = app;
 
-// Jalankan server
+// Jalankan server local
+/*
 const PORT = process.env.PORT || 6969;
 app.listen(PORT, () => {
   console.log(`Server berjalan di http://localhost:${PORT}`);
 });
+*/
