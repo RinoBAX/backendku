@@ -1,7 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// 1. Konfigurasi datasource dan generator
 datasource db {
   provider = "mysql"
   url      = env("DATABASE_URL")
@@ -11,20 +7,16 @@ generator client {
   provider = "prisma-client-js"
 }
 
-// 2. Definisi Model (Tabel)
-
-/// Tabel untuk menyimpan data pengguna (PENGGUNA)
 model User {
   id               Int                @id @default(autoincrement())
   nama             String
   email            String             @unique
   password         String
   kodeReferral     String             @unique
-  statusRegistrasi RegistrationStatus @default(PENDING) /// Status registrasi oleh admin
+  statusRegistrasi RegistrationStatus @default(PENDING)
   balance          Decimal            @default(0)
-  picture          String
+  picture          String?
 
-  // Relasi self-referencing untuk struktur upline-downline
   uplineId  Int?
   upline    User?  @relation("ReferralTree", fields: [uplineId], references: [id])
   downlines User[] @relation("ReferralTree")
@@ -38,25 +30,20 @@ model User {
   @@map("users")
 }
 
-/// Tabel untuk menyimpan data proyek (PROYEK)
 model Project {
   id          Int     @id @default(autoincrement())
   namaProyek  String
   iconUrl     String
-  nilaiProyek Decimal /// Nilai yang didapat pengerja
-
+  nilaiProyek Decimal 
   fields      ProjectField[]
   submissions ProjectSubmission[]
-
   tglDibuat DateTime @default(now())
-
   @@map("projects")
 }
 
-/// Tabel untuk field dinamis setiap proyek (PROYEK_FIELD)
 model ProjectField {
   id         Int       @id @default(autoincrement())
-  namaField  String /// Contoh: "Foto KTP"
+  namaField  String 
   tipeField  FieldType
   wajibDiisi Boolean   @default(true)
 

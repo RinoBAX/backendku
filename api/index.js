@@ -7,7 +7,7 @@ const multer = require('multer');
 const path = require('path');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { cuid } = require('@prisma/client/runtime/library'); // Import cuid
+const cuid = require('cuid'); // Import dari paket 'cuid' yang sudah diinstal
 
 // Inisialisasi Express App dan Prisma Client
 const app = express();
@@ -393,3 +393,10 @@ app.put('/api/admin/withdrawals/:id/approve', authenticateToken, isAdmin, async 
 
 // Ekspor app untuk digunakan oleh Vercel
 module.exports = app;
+
+
+// Jalankan server
+const PORT = process.env.PORT || 6969;
+app.listen(PORT, () => {
+  console.log(`Server berjalan di http://localhost:${PORT}`);
+});
