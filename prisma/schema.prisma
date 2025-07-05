@@ -55,7 +55,6 @@ model ProjectField {
   @@map("project_fields")
 }
 
-/// Tabel untuk pengerjaan proyek oleh pengguna (PROYEK_SELESAI)
 model ProjectSubmission {
   id        Int              @id @default(autoincrement())
   status    SubmissionStatus @default(PENDING)
@@ -76,10 +75,9 @@ model ProjectSubmission {
   @@map("project_submissions")
 }
 
-/// Tabel untuk data yang diisi pengguna per field (DATA_ISIAN)
 model SubmissionData {
   id    Int    @id @default(autoincrement())
-  nilai String /// Isi field (teks atau URL file/gambar)
+  nilai String 
 
   submissionId Int
   submission   ProjectSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
@@ -90,7 +88,6 @@ model SubmissionData {
   @@map("submission_data")
 }
 
-/// Tabel untuk semua riwayat transaksi keuangan (TRANSAKSI)
 model Transaction {
   id     Int             @id @default(autoincrement())
   tipe   TransactionType
@@ -102,7 +99,7 @@ model Transaction {
   submissionId Int?
   submission   ProjectSubmission? @relation(fields: [submissionId], references: [id])
 
-  withdrawalId Int?        @unique // Satu penarikan hanya menghasilkan satu transaksi
+  withdrawalId Int?        @unique 
   withdrawal   Withdrawal? @relation(fields: [withdrawalId], references: [id])
 
   transactionDate DateTime @default(now())
@@ -110,7 +107,6 @@ model Transaction {
   @@map("transactions")
 }
 
-/// Tabel untuk permintaan penarikan dana (PENARIKAN)
 model Withdrawal {
   id              Int              @id @default(autoincrement())
   totalWithdrawal Decimal
@@ -126,8 +122,6 @@ model Withdrawal {
 
   @@map("withdrawals")
 }
-
-// 3. Definisi Enum (Tipe data kustom)
 
 enum RegistrationStatus {
   PENDING
@@ -154,8 +148,8 @@ enum WithdrawalStatus {
 }
 
 enum TransactionType {
-  PENGERJAAN // Untuk pengerja utama
-  KOMISI_UPLINE1 // Komisi 10% untuk upline L1
-  KOMISI_UPLINE2 // Komisi 1% untuk upline L2
-  PENARIKAN // Pengurangan saldo saat withdraw
+  PENGERJAAN
+  KOMISI_UPLINE1 
+  KOMISI_UPLINE2 
+  PENARIKAN
 }
