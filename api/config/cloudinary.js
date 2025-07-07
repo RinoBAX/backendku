@@ -9,7 +9,7 @@ cloudinary.config({
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
-    folder: 'mlm_app_uploads', 
+    folder: 'theBaxLancer_app', 
     allowed_formats: ['jpg', 'png', 'jpeg'],
   },
 });
