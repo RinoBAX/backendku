@@ -12,12 +12,13 @@ model User {
   id               Int                @id @default(autoincrement())
   nama             String
   email            String             @unique
-  password         String 
-  picture          String? 
+  password         String
+  picture          String?
   nomorTelepon     String?            @unique
   kecamatan        String?
   domisili         String?
-  fotoKtp          String? 
+  fotoKtp          String?
+  tglLahir         DateTime?          // Field tanggal lahir ditambahkan
 
   kodeReferral     String             @unique
   uplineId         Int?
@@ -28,16 +29,17 @@ model User {
   role             Role               @default(USER)
   statusRegistrasi RegistrationStatus @default(PENDING)
 
-  projectsCreated  Project[] 
-  submissions      Submission[] 
-  withdrawals      Withdrawal[] 
-  transactions     Transaction[] 
+  projectsCreated  Project[]
+  submissions      Submission[]
+  withdrawals      Withdrawal[]
+  transactions     Transaction[]
 
   tglDibuat        DateTime           @default(now())
   tglDiperbarui    DateTime           @updatedAt
 
   @@map("users")
 }
+
 
 model Project {
   id          Int      @id @default(autoincrement())
