@@ -1,3 +1,4 @@
+
 datasource db {
   provider = "mysql"
   url      = env("DATABASE_URL")
@@ -11,122 +12,145 @@ model User {
   id               Int                @id @default(autoincrement())
   nama             String
   email            String             @unique
-  password         String
-  kodeReferral     String             @unique
-  statusRegistrasi RegistrationStatus @default(PENDING)
-  balance          Decimal            @default(0)
-  picture          String?
-  role             Role               @default(USER) // <-- TAMBAHKAN BARIS INI
+  password         String 
+  picture          String? 
+  nomorTelepon     String?            @unique
+  kecamatan        String?
+  domisili         String?
+  fotoKtp          String? 
+
+  kodeReferral     String             @unique @default(cuid())
   uplineId         Int?
-  upline           User?              @relation("ReferralTree", fields: [uplineId], references: [id])
+  upline           User?              @relation("ReferralTree", fields: [uplineId], references: [id], onDelete: SetNull)
   downlines        User[]             @relation("ReferralTree")
 
-  projectSubmissions ProjectSubmission[]
-  withdrawals        Withdrawal[]
-  transactions       Transaction[]
+  balance          Decimal            @default(0) @db.Decimal(12, 2)
+  role             Role               @default(USER)
+  statusRegistrasi RegistrationStatus @default(PENDING)
 
-  tglDibuat DateTime @default(now())
+  projectsCreated  Project[] 
+  submissions      Submission[] 
+  withdrawals      Withdrawal[] 
+  transactions     Transaction[] 
+
+  tglDibuat        DateTime           @default(now())
+  tglDiperbarui    DateTime           @updatedAt
 
   @@map("users")
 }
 
 model Project {
-  id          Int                 @id @default(autoincrement())
+  id          Int      @id @default(autoincrement())
   namaProyek  String
-  iconUrl     String
-  nilaiProyek Decimal
+  nilaiProyek Decimal  @db.Decimal(12, 2) 
+  projectUrl  String?
+  
+  creatorId   Int
+  creator     User     @relation(fields: [creatorId], references: [id])
+
   fields      ProjectField[]
-  submissions ProjectSubmission[]
-  tglDibuat   DateTime            @default(now())
+  submissions Submission[]
+
+  tglDibuat   DateTime @default(now())
 
   @@map("projects")
 }
 
 model ProjectField {
-  id         Int       @id @default(autoincrement())
-  namaField  String
-  tipeField  FieldType
-  wajibDiisi Boolean   @default(true)
+  id          Int       @id @default(autoincrement())
+  label       String 
+  fieldType   FieldType 
+  isRequired  Boolean   @default(true)
 
-  projectId Int
-  project   Project @relation(fields: [projectId], references: [id])
+  projectId   Int
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
-  dataEntries SubmissionData[]
+  submissionValues SubmissionValue[]
 
   @@map("project_fields")
 }
 
-model ProjectSubmission {
-  id        Int              @id @default(autoincrement())
-  status    SubmissionStatus @default(PENDING)
-  noteAdmin String?
 
-  userId Int
-  user   User @relation(fields: [userId], references: [id])
+model Submission {
+  id               Int              @id @default(autoincrement())
+  status           SubmissionStatus @default(PENDING) 
+  catatanAdmin     String?          
 
-  projectId Int
-  project   Project @relation(fields: [projectId], references: [id])
+  userId           Int
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  dataEntries  SubmissionData[]
-  transactions Transaction[]
+  projectId        Int
+  project          Project          @relation(fields: [projectId], references: [id], onDelete: Restrict)
 
-  tglDikirim  DateTime  @default(now())
-  tglDiproses DateTime?
+  values           SubmissionValue[]
+  transactions     Transaction[]
 
-  @@map("project_submissions")
+  tglDibuat        DateTime         @default(now())
+
+  @@map("submissions")
 }
 
-model SubmissionData {
-  id    Int    @id @default(autoincrement())
-  nilai String
+model SubmissionValue {
+  id          Int    @id @default(autoincrement())
+  value       String @db.Text 
 
   submissionId Int
-  submission   ProjectSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
 
-  fieldId Int
-  field   ProjectField @relation(fields: [fieldId], references: [id])
+  projectFieldId Int
+  projectField   ProjectField @relation(fields: [projectFieldId], references: [id], onDelete: Cascade)
 
-  @@map("submission_data")
+  @@map("submission_values")
 }
 
+
 model Transaction {
-  id     Int             @id @default(autoincrement())
-  tipe   TransactionType
-  jumlah Decimal
+  id              Int             @id @default(autoincrement())
+  tipe            TransactionType
+  jumlah          Decimal         @db.Decimal(12, 2)
+  deskripsi       String
 
-  userId Int
-  user   User @relation(fields: [userId], references: [id])
+  userId          Int
+  user            User            @relation(fields: [userId], references: [id], onDelete: Restrict)
 
-  submissionId Int?
-  submission   ProjectSubmission? @relation(fields: [submissionId], references: [id])
+  submissionId    Int?
+  submission      Submission?     @relation(fields: [submissionId], references: [id], onDelete: SetNull)
 
-  withdrawalId Int?        @unique
-  withdrawal   Withdrawal? @relation(fields: [withdrawalId], references: [id])
+  withdrawalId    Int?            @unique 
+  withdrawal      Withdrawal?     @relation(fields: [withdrawalId], references: [id])
 
-  transactionDate DateTime @default(now())
+  transactionDate DateTime        @default(now())
 
   @@map("transactions")
 }
 
 model Withdrawal {
   id              Int              @id @default(autoincrement())
-  totalWithdrawal Decimal
-  status          WithdrawalStatus @default(PENDING)
+  totalWithdrawal Decimal          @db.Decimal(12, 2)
+  status          WithdrawalStatus @default(PENDING) 
 
-  userId Int
-  user   User @relation(fields: [userId], references: [id])
+  userId          Int
+  user            User             @relation(fields: [userId], references: [id], onDelete: Restrict)
 
-  transaction Transaction?
+  transaction     Transaction?
 
-  tglDiajukan DateTime  @default(now())
-  tglDiproses DateTime?
+  tglDiajukan     DateTime         @default(now())
+  tglDiproses     DateTime?
 
   @@map("withdrawals")
+}
+
+
+enum Role {
+  USER
+  ADMIN
+  SUPER_ADMIN
 }
 
 enum RegistrationStatus {
   PENDING
   APPROVED
+  REJECTED
 }
 
 enum FieldType {
@@ -149,13 +173,8 @@ enum WithdrawalStatus {
 }
 
 enum TransactionType {
-  PENGERJAAN
-  KOMISI_UPLINE1
-  KOMISI_UPLINE2
-  PENARIKAN
-}
-
-enum Role {
-  USER
-  ADMIN
+  PENGERJAAN_PROYEK 
+  KOMISI_UPLINE_1   
+  KOMISI_UPLINE_2   
+  PENARIKAN_DANA    
 }
