@@ -19,7 +19,7 @@ model User {
   domisili         String?
   fotoKtp          String? 
 
-  kodeReferral     String             @unique @default(cuid())
+  kodeReferral     String             @unique
   uplineId         Int?
   upline           User?              @relation("ReferralTree", fields: [uplineId], references: [id], onDelete: SetNull)
   downlines        User[]             @relation("ReferralTree")

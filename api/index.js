@@ -5,8 +5,8 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { PrismaClient, Prisma } = require('@prisma/client');
 const { Decimal } = require('@prisma/client/runtime/library');
-const authorize = require('./middleware/auth'); 
-const { upload } = require('./config/cloudinary'); 
+const authorize = require('./middleware/auth');
+const { upload } = require('./config/cloudinary');
 
 const prisma = new PrismaClient();
 const app = express();
@@ -14,50 +14,99 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.post('/api/auth/register', async (req, res) => {
-  const { nama, email, password, nomorTelepon, kecamatan, domisili, fotoKtp, kodeReferralUpline } = req.body;
+    // tglLahir tidak lagi wajib untuk format referral ini
+    const { nama, email, password, tglLahir, nomorTelepon, kecamatan, domisili, fotoKtp, kodeReferralUpline } = req.body;
 
-  try {
-    if (!nama || !email || !password) {
-      return res.status(400).json({ message: 'Nama, email, dan password wajib diisi.' });
+    try {
+        if (!nama || !email || !password) {
+            return res.status(400).json({ message: 'Nama, email, dan password wajib diisi.' });
+        }
+        const existingUser = await prisma.user.findUnique({ where: { email } });
+        if (existingUser) {
+            return res.status(400).json({ message: 'Email sudah terdaftar.' });
+        }
+
+        let uplineId = null;
+        if (kodeReferralUpline) {
+            const upline = await prisma.user.findUnique({ where: { kodeReferral: kodeReferralUpline } });
+            if (!upline) {
+                return res.status(404).json({ message: 'Kode referral tidak valid.' });
+            }
+            uplineId = upline.id;
+        }
+
+        // --- AWAL DARI LOGIKA KODE REFERRAL KUSTOM BARU ---
+        let newReferralCode = '';
+        let isCodeUnique = false;
+        // 1. Bersihkan nama dari spasi/simbol dan ubah ke huruf besar
+        const cleanName = nama.replace(/[^a-zA-Z]/g, '').toUpperCase();
+
+        // Validasi panjang nama
+        if (cleanName.length < 3) {
+            return res.status(400).json({ message: 'Nama harus memiliki setidaknya 3 karakter huruf untuk membuat kode referral.' });
+        }
+
+        // 2. Ambil 3 huruf depan dan belakang
+        const firstThree = cleanName.slice(0, 3);
+        const lastThree = cleanName.slice(-3);
+
+        // 3. Lakukan perulangan hingga kita menemukan kode yang unik
+        while (!isCodeUnique) {
+            const generateRandomLetters = (length) => {
+                const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+                let result = '';
+                const charactersLength = characters.length;
+                for (let i = 0; i < length; i++) {
+                    result += characters.charAt(Math.floor(Math.random() * charactersLength));
+                }
+                return result;
+            };
+            // Buat bagian acak sesuai format
+            const randomNumber = Math.floor(Math.random() * 999) + 1; // Angka 1-999
+            const randomLetters = generateRandomLetters(3);             // 3 huruf acak A-Z
+
+            // Gabungkan semua bagian menjadi satu kode kandidat
+            const candidateCode = `${lastThree}${randomNumber}${firstThree}${randomLetters}`;
+
+            // Periksa apakah kode sudah ada di database
+            const codeExists = await prisma.user.findUnique({
+                where: { kodeReferral: candidateCode },
+            });
+
+            // Jika tidak ada, kita gunakan kode ini dan hentikan perulangan
+            if (!codeExists) {
+                newReferralCode = candidateCode;
+                isCodeUnique = true;
+            }
+        }
+        // --- AKHIR DARI LOGIKA KODE REFERRAL KUSTOM BARU ---
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        const newUser = await prisma.user.create({
+            data: {
+                nama,
+                email,
+                password: hashedPassword,
+                tglLahir: tglLahir ? new Date(tglLahir) : null, // Simpan tglLahir jika diberikan
+                nomorTelepon,
+                kecamatan,
+                domisili,
+                fotoKtp,
+                uplineId,
+                kodeReferral: newReferralCode, // Gunakan kode baru yang kita buat
+            },
+            select: { id: true, nama: true, email: true, kodeReferral: true }
+        });
+
+        res.status(201).json(newUser);
+    } catch (error) {
+        console.error('Error saat registrasi:', error);
+        if (error instanceof Prisma.PrismaClientValidationError) {
+            return res.status(400).json({ message: 'Input tidak valid.', details: error.message });
+        }
+        res.status(500).json({ message: 'Terjadi kesalahan pada server.' });
     }
-    const existingUser = await prisma.user.findUnique({ where: { email } });
-    if (existingUser) {
-      return res.status(400).json({ message: 'Email sudah terdaftar.' });
-    }
-
-    let uplineId = null;
-    if (kodeReferralUpline) {
-      const upline = await prisma.user.findUnique({ where: { kodeReferral: kodeReferralUpline } });
-      if (!upline) {
-        return res.status(404).json({ message: 'Kode referral tidak valid.' });
-      }
-      uplineId = upline.id;
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    const newUser = await prisma.user.create({
-      data: {
-        nama,
-        email,
-        password: hashedPassword,
-        nomorTelepon,
-        kecamatan,
-        domisili,
-        fotoKtp,
-        uplineId,
-      },
-      select: { id: true, nama: true, email: true, kodeReferral: true } // Hanya kembalikan data yang aman
-    });
-
-    res.status(201).json(newUser);
-  } catch (error) {
-    console.error('Error saat registrasi:', error);
-    if (error instanceof Prisma.PrismaClientValidationError) {
-      return res.status(400).json({ message: 'Input tidak valid.', details: error.message });
-    }
-    res.status(500).json({ message: 'Terjadi kesalahan pada server.' });
-  }
 });
 
 app.post('/api/auth/login', async (req, res) => {
@@ -76,7 +125,7 @@ app.post('/api/auth/login', async (req, res) => {
         if (!isPasswordValid) {
             return res.status(401).json({ message: 'Email atau password salah.' });
         }
-        
+
         const userPayload = { userId: user.id };
 
         const accessToken = jwt.sign(userPayload, process.env.JWT_SECRET, { expiresIn: '1d' });
@@ -109,7 +158,7 @@ app.get('/api/users/me', authorize(), async (req, res) => {
                 downlines: { select: { id: true, nama: true, email: true } },
                 upline: { select: { id: true, nama: true, email: true } },
                 transactions: { orderBy: { transactionDate: 'desc' } },
-                submissions: { orderBy: { tglDibuat: 'desc' }, include: { project: { select: { namaProyek: true }} } }
+                submissions: { orderBy: { tglDibuat: 'desc' }, include: { project: { select: { namaProyek: true } } } }
             }
         });
         if (!user) {
@@ -130,7 +179,7 @@ app.put('/api/users/me/picture', authorize(), upload.single('picture'), async (r
     try {
         const updatedUser = await prisma.user.update({
             where: { id: req.user.id },
-            data: { picture: req.file.path } 
+            data: { picture: req.file.path }
         });
         res.json({ message: 'Foto profil berhasil diperbarui.', pictureUrl: updatedUser.picture });
     } catch (error) {
@@ -169,9 +218,9 @@ app.post('/api/projects/:projectId/submit', authorize(), upload.any(), async (re
                 }
             });
 
-            const projectFields = await tx.projectField.findMany({ where: { projectId: parseInt(projectId) }});
+            const projectFields = await tx.projectField.findMany({ where: { projectId: parseInt(projectId) } });
             const fieldMap = new Map(projectFields.map(f => [f.id.toString(), f]));
-            
+
             const submissionValues = [];
 
             for (const key in req.body) {
@@ -188,7 +237,7 @@ app.post('/api/projects/:projectId/submit', authorize(), upload.any(), async (re
                 req.files.forEach(file => {
                     if (fieldMap.has(file.fieldname)) {
                         submissionValues.push({
-                            value: file.path, 
+                            value: file.path,
                             submissionId: newSubmission.id,
                             projectFieldId: parseInt(file.fieldname),
                         });
@@ -199,7 +248,7 @@ app.post('/api/projects/:projectId/submit', authorize(), upload.any(), async (re
             if (submissionValues.length > 0) {
                 await tx.submissionValue.createMany({ data: submissionValues });
             }
-            
+
             return newSubmission;
         });
         res.status(201).json({ message: 'Pengerjaan berhasil dikirim.', submission });
@@ -335,7 +384,7 @@ app.put('/api/superadmin/withdrawals/:id/approve', authorize(['SUPER_ADMIN']), a
             if (!withdrawal) throw new Error('Permintaan penarikan tidak ditemukan.');
             if (withdrawal.status !== 'PENDING') throw new Error('Permintaan ini sudah diproses.');
 
-            const user = await tx.user.findUnique({ where: {id: withdrawal.userId }});
+            const user = await tx.user.findUnique({ where: { id: withdrawal.userId } });
             if (new Decimal(user.balance).lessThan(withdrawal.totalWithdrawal)) {
                 throw new Error('Saldo pengguna tidak mencukupi untuk penarikan ini.');
             }
@@ -361,9 +410,9 @@ app.put('/api/superadmin/withdrawals/:id/approve', authorize(['SUPER_ADMIN']), a
 // =============================================
 // SERVER START
 // =============================================
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 6969;
 app.listen(PORT, () => {
-  console.log(`Server berjalan di http://localhost:${PORT}`);
+    console.log(`Server berjalan di http://localhost:${PORT}`);
 });
 
 module.exports = app;
