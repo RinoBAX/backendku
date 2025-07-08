@@ -51,8 +51,8 @@ app.post('/api/auth/register', async (req, res) => {
                 }
                 return result;
             };
-            const randomNumber = Math.floor(Math.random() * 999) + 1; // Angka 1-999
-            const randomLetters = generateRandomLetters(3);             // 3 huruf acak A-Z
+            const randomNumber = Math.floor(Math.random() * 999) + 1; 
+            const randomLetters = generateRandomLetters(3);
             const candidateCode = `${lastThree}${randomNumber}${firstThree}${randomLetters}`;
             const codeExists = await prisma.user.findUnique({
                 where: { kodeReferral: candidateCode },
@@ -177,7 +177,11 @@ app.put('/api/users/me/picture', authorize(), upload.single('picture'), async (r
 app.get('/api/projects', authorize(), async (req, res) => {
     try {
         const projects = await prisma.project.findMany({
-            include: { fields: true }
+            include: { 
+                fields: true,
+                creator: { select: { nama: true }},
+                submissions: { select: { status: true }} 
+            }
         });
         res.json(projects);
     } catch (error) {
@@ -246,7 +250,7 @@ app.post('/api/projects/:projectId/submit', authorize(), upload.any(), async (re
 
 app.post('/api/admin/projects', authorize(['ADMIN']), async (req, res) => {
     const { namaProyek, projectUrl, nilaiProyek, fields } = req.body;
-    const creatorId = req.user.id; // Diambil dari token
+    const creatorId = req.user.id;
 
     if (!namaProyek || !nilaiProyek || !fields || !Array.isArray(fields) || fields.length === 0) {
         return res.status(400).json({ message: 'Data tidak lengkap.' });
@@ -318,11 +322,9 @@ app.put('/api/admin/projects/:id', authorize(['ADMIN']), async (req, res) => {
                     projectUrl,
                 }
             });
-
             await tx.projectField.deleteMany({
                 where: { projectId: projectId },
             });
-
             if (fields && fields.length > 0) {
                 await tx.projectField.createMany({
                     data: fields.map(field => ({
@@ -332,7 +334,6 @@ app.put('/api/admin/projects/:id', authorize(['ADMIN']), async (req, res) => {
                     })),
                 });
             }
-
             return tx.project.findUnique({
                 where: { id: projectId },
                 include: { fields: true },
@@ -351,7 +352,7 @@ app.delete('/api/admin/projects/:id', authorize(['ADMIN']), async (req, res) => 
         await prisma.project.delete({
             where: { id: parseInt(req.params.id) }
         });
-        res.status(204).send();
+        res.status(204).send(); // No Content
     } catch (error) {
         res.status(500).json({ message: 'Gagal menghapus proyek.' });
     }
@@ -366,6 +367,13 @@ app.get('/api/admin/users', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res
         }
         const users = await prisma.user.findMany({
             where: whereClause,
+            include: {
+                submissions: {
+                    select: {
+                        id: true 
+                    }
+                }
+            },
             orderBy: { tglDibuat: 'desc' }
         });
         res.json(users);
@@ -395,53 +403,117 @@ app.get('/api/admin/submissions', authorize(['ADMIN']), async (req, res) => {
     }
 });
 
+app.get('/api/admin/submissions/:id', authorize(['ADMIN']), async (req, res) => {
+    const submissionId = parseInt(req.params.id);
+    try {
+        const submission = await prisma.submission.findUnique({
+            where: { id: submissionId },
+            include: {
+                user: { select: { nama: true } },
+                project: { select: { namaProyek: true } },
+                // Menyertakan data values dan field aslinya untuk ditampilkan di modal
+                values: {
+                    include: {
+                        projectField: true,
+                    },
+                },
+            },
+        });
+
+        if (!submission) {
+            return res.status(404).json({ message: 'Submission tidak ditemukan.' });
+        }
+
+        res.json(submission);
+    } catch (error) {
+        console.error(`Gagal mengambil detail submission ${submissionId}:`, error);
+        res.status(500).json({ message: 'Gagal mengambil detail submission.' });
+    }
+});
+
 app.put('/api/admin/submissions/:id/approve', authorize(['ADMIN']), async (req, res) => {
     const submissionId = parseInt(req.params.id);
     try {
-        await prisma.$transaction(async (tx) => {
+        const updatedSubmission = await prisma.$transaction(async (tx) => {
             const submission = await tx.submission.findUnique({
                 where: { id: submissionId },
                 include: {
                     project: true,
-                    user: { include: { upline: { include: { upline: true } } } }
+                    user: { 
+                        include: { 
+                            upline: { 
+                                include: { 
+                                    upline: true 
+                                } 
+                            } 
+                        } 
+                    }
                 }
             });
 
             if (!submission) throw new Error('Submission tidak ditemukan.');
-            if (submission.status !== 'PENDING') throw new Error('Submission ini sudah diproses.');
+            if (submission.status !== 'PENDING') throw new Error('Submission ini sudah pernah diproses.');
 
             const { user: pengerja, project } = submission;
             const nilaiProyek = new Decimal(project.nilaiProyek);
+
             await tx.user.update({
                 where: { id: pengerja.id },
                 data: { balance: { increment: nilaiProyek } },
             });
             await tx.transaction.create({
-                data: { tipe: 'PENGERJAAN_PROYEK', jumlah: nilaiProyek, deskripsi: `Bonus pengerjaan proyek: ${project.namaProyek}`, userId: pengerja.id, submissionId }
+                data: { 
+                    tipe: 'PENGERJAAN_PROYEK', 
+                    jumlah: nilaiProyek, 
+                    deskripsi: `Bonus pengerjaan proyek: ${project.namaProyek}`, 
+                    userId: pengerja.id, 
+                    submissionId: submission.id 
+                }
             });
+
             const uplineL1 = pengerja.upline;
             if (uplineL1) {
                 const komisiL1 = nilaiProyek.mul(0.10);
                 await tx.user.update({ where: { id: uplineL1.id }, data: { balance: { increment: komisiL1 } } });
-                await tx.transaction.create({ data: { tipe: 'KOMISI_UPLINE_1', jumlah: komisiL1, deskripsi: `Komisi dari ${pengerja.nama}`, userId: uplineL1.id, submissionId } });
+                await tx.transaction.create({ 
+                    data: { 
+                        tipe: 'KOMISI_UPLINE_1', 
+                        jumlah: komisiL1, 
+                        deskripsi: `Komisi dari downline: ${pengerja.nama}`, 
+                        userId: uplineL1.id, 
+                        submissionId: submission.id 
+                    } 
+                });
+
                 const uplineL2 = uplineL1.upline;
                 if (uplineL2) {
-                    const komisiL2 = nilaiProyek.mul(0.01);
+                    const komisiL2 = nilaiProyek.mul(0.01); 
                     await tx.user.update({ where: { id: uplineL2.id }, data: { balance: { increment: komisiL2 } } });
-                    await tx.transaction.create({ data: { tipe: 'KOMISI_UPLINE_2', jumlah: komisiL2, deskripsi: `Komisi dari ${pengerja.nama}`, userId: uplineL2.id, submissionId } });
+                    await tx.transaction.create({ 
+                        data: { 
+                            tipe: 'KOMISI_UPLINE_2', 
+                            jumlah: komisiL2, 
+                            deskripsi: `Komisi dari downline level 2: ${pengerja.nama}`, 
+                            userId: uplineL2.id, 
+                            submissionId: submission.id 
+                        } 
+                    });
                 }
             }
 
-            await tx.submission.update({
+            return tx.submission.update({
                 where: { id: submissionId },
                 data: { status: 'APPROVED' },
             });
         });
-        res.json({ message: `Submission ID ${submissionId} berhasil disetujui.` });
+        
+        res.json({ message: `Submission ID ${submissionId} berhasil disetujui.`, submission: updatedSubmission });
     } catch (error) {
-        res.status(500).json({ message: error.message || 'Gagal menyetujui pengerjaan.' });
+        console.error(`Gagal menyetujui submission ${submissionId}:`, error);
+        res.status(500).json({ message: error.message || 'Gagal memproses persetujuan.' });
     }
 });
+
 app.put('/api/admin/submissions/:id/reject', authorize(['ADMIN']), async (req, res) => {
     const { catatanAdmin } = req.body;
     try {
