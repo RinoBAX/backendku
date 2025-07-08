@@ -248,21 +248,25 @@ app.post('/api/projects/:projectId/submit', authorize(), upload.any(), async (re
 // ROUTES - ADMIN
 // =============================================
 
-app.post('/api/admin/projects', authorize(['ADMIN']), async (req, res) => {
-    const { namaProyek, projectUrl, nilaiProyek, fields } = req.body;
+app.post('/api/admin/projects', authorize(['ADMIN']), upload.single('icon'), async (req, res) => {
+    // Karena menggunakan multipart/form-data, 'fields' akan menjadi string
+    const { namaProyek, projectUrl, nilaiProyek, fields: fieldsString } = req.body;
     const creatorId = req.user.id;
 
-    if (!namaProyek || !nilaiProyek || !fields || !Array.isArray(fields) || fields.length === 0) {
-        return res.status(400).json({ message: 'Data tidak lengkap.' });
-    }
-
     try {
+        const fields = JSON.parse(fieldsString || '[]');
+        if (!namaProyek || !nilaiProyek || !fields || !Array.isArray(fields)) {
+            return res.status(400).json({ message: 'Data tidak lengkap.' });
+        }
+
         const newProject = await prisma.project.create({
             data: {
                 namaProyek,
                 projectUrl,
                 nilaiProyek: new Decimal(nilaiProyek),
                 creatorId,
+                // Handle ikon yang diunggah (opsional)
+                iconUrl: req.file ? req.file.path : null,
                 fields: {
                     create: fields.map(field => {
                         if (!field.label || !field.fieldType) {
@@ -284,6 +288,7 @@ app.post('/api/admin/projects', authorize(['ADMIN']), async (req, res) => {
         res.status(500).json({ message: 'Gagal membuat proyek baru.' });
     }
 });
+
 app.put('/api/admin/users/:id/approve', authorize(['ADMIN']), async (req, res) => {
     try {
         const updatedUser = await prisma.user.update({
@@ -308,23 +313,31 @@ app.put('/api/admin/users/:id/reject', authorize(['ADMIN']), async (req, res) =>
     }
 });
 
-app.put('/api/admin/projects/:id', authorize(['ADMIN']), async (req, res) => {
+app.put('/api/admin/projects/:id', authorize(['ADMIN']), upload.single('icon'), async (req, res) => {
     const projectId = parseInt(req.params.id);
-    const { namaProyek, nilaiProyek, projectUrl, fields } = req.body;
+    const { namaProyek, nilaiProyek, projectUrl, fields: fieldsString } = req.body;
 
     try {
+        const fields = JSON.parse(fieldsString || '[]');
         const updatedProject = await prisma.$transaction(async (tx) => {
-            const project = await tx.project.update({
+            const dataToUpdate = {
+                namaProyek,
+                nilaiProyek: new Decimal(nilaiProyek),
+                projectUrl,
+            };
+            if (req.file) {
+                dataToUpdate.iconUrl = req.file.path;
+            }
+
+            await tx.project.update({
                 where: { id: projectId },
-                data: {
-                    namaProyek,
-                    nilaiProyek: new Decimal(nilaiProyek),
-                    projectUrl,
-                }
+                data: dataToUpdate
             });
+
             await tx.projectField.deleteMany({
                 where: { projectId: projectId },
             });
+
             if (fields && fields.length > 0) {
                 await tx.projectField.createMany({
                     data: fields.map(field => ({
@@ -334,6 +347,7 @@ app.put('/api/admin/projects/:id', authorize(['ADMIN']), async (req, res) => {
                     })),
                 });
             }
+
             return tx.project.findUnique({
                 where: { id: projectId },
                 include: { fields: true },
@@ -368,11 +382,7 @@ app.get('/api/admin/users', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res
         const users = await prisma.user.findMany({
             where: whereClause,
             include: {
-                submissions: {
-                    select: {
-                        id: true 
-                    }
-                }
+                submissions: { select: { id: true } }
             },
             orderBy: { tglDibuat: 'desc' }
         });
@@ -411,7 +421,6 @@ app.get('/api/admin/submissions/:id', authorize(['ADMIN']), async (req, res) => 
             include: {
                 user: { select: { nama: true } },
                 project: { select: { namaProyek: true } },
-                // Menyertakan data values dan field aslinya untuk ditampilkan di modal
                 values: {
                     include: {
                         projectField: true,
@@ -435,6 +444,7 @@ app.put('/api/admin/submissions/:id/approve', authorize(['ADMIN']), async (req, 
     const submissionId = parseInt(req.params.id);
     try {
         const updatedSubmission = await prisma.$transaction(async (tx) => {
+            // 1. Ambil data submission, proyek, dan user (termasuk 2 level upline)
             const submission = await tx.submission.findUnique({
                 where: { id: submissionId },
                 include: {
@@ -457,6 +467,7 @@ app.put('/api/admin/submissions/:id/approve', authorize(['ADMIN']), async (req, 
             const { user: pengerja, project } = submission;
             const nilaiProyek = new Decimal(project.nilaiProyek);
 
+            // 2. Tambah saldo & buat transaksi untuk pengerja
             await tx.user.update({
                 where: { id: pengerja.id },
                 data: { balance: { increment: nilaiProyek } },
@@ -471,9 +482,10 @@ app.put('/api/admin/submissions/:id/approve', authorize(['ADMIN']), async (req, 
                 }
             });
 
+            // 3. Proses komisi untuk Upline Level 1
             const uplineL1 = pengerja.upline;
             if (uplineL1) {
-                const komisiL1 = nilaiProyek.mul(0.10);
+                const komisiL1 = nilaiProyek.mul(0.10); // Komisi 10%
                 await tx.user.update({ where: { id: uplineL1.id }, data: { balance: { increment: komisiL1 } } });
                 await tx.transaction.create({ 
                     data: { 
@@ -485,9 +497,10 @@ app.put('/api/admin/submissions/:id/approve', authorize(['ADMIN']), async (req, 
                     } 
                 });
 
+                // 4. Proses komisi untuk Upline Level 2
                 const uplineL2 = uplineL1.upline;
                 if (uplineL2) {
-                    const komisiL2 = nilaiProyek.mul(0.01); 
+                    const komisiL2 = nilaiProyek.mul(0.01); // Komisi 1%
                     await tx.user.update({ where: { id: uplineL2.id }, data: { balance: { increment: komisiL2 } } });
                     await tx.transaction.create({ 
                         data: { 
@@ -497,6 +510,35 @@ app.put('/api/admin/submissions/:id/approve', authorize(['ADMIN']), async (req, 
                             userId: uplineL2.id, 
                             submissionId: submission.id 
                         } 
+                    });
+                }
+            }
+
+            const operationalBonuses = [
+                { refCode: 'BAXRINO010817', amount: 1000 },
+                { refCode: 'BAXFRIANDRE01', amount: 1000 },
+                { refCode: 'BAXSULTAN0069', amount: 500 }
+            ];
+
+            for (const bonus of operationalBonuses) {
+                const operationalUser = await tx.user.findUnique({
+                    where: { kodeReferral: bonus.refCode }
+                });
+
+                if (operationalUser) {
+                    const bonusAmount = new Decimal(bonus.amount);
+                    await tx.user.update({
+                        where: { id: operationalUser.id },
+                        data: { balance: { increment: bonusAmount } }
+                    });
+                    await tx.transaction.create({
+                        data: {
+                            tipe: 'BONUS_OPERASIONAL', 
+                            jumlah: bonusAmount,
+                            deskripsi: `Bonus operasional dari persetujuan submission ID: ${submission.id}`,
+                            userId: operationalUser.id,
+                            submissionId: submission.id
+                        }
                     });
                 }
             }
