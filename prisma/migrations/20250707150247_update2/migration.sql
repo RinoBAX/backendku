@@ -9,6 +9,7 @@ CREATE TABLE `users` (
     `kecamatan` VARCHAR(191) NULL,
     `domisili` VARCHAR(191) NULL,
     `fotoKtp` VARCHAR(191) NULL,
+    `tglLahir` DATETIME(3) NULL,
     `kodeReferral` VARCHAR(191) NOT NULL,
     `uplineId` INTEGER NULL,
     `balance` DECIMAL(12, 2) NOT NULL DEFAULT 0,

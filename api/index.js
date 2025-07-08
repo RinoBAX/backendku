@@ -14,7 +14,6 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.post('/api/auth/register', async (req, res) => {
-    // tglLahir tidak lagi wajib untuk format referral ini
     const { nama, email, password, tglLahir, nomorTelepon, kecamatan, domisili, fotoKtp, kodeReferralUpline } = req.body;
 
     try {
@@ -34,23 +33,14 @@ app.post('/api/auth/register', async (req, res) => {
             }
             uplineId = upline.id;
         }
-
-        // --- AWAL DARI LOGIKA KODE REFERRAL KUSTOM BARU ---
         let newReferralCode = '';
         let isCodeUnique = false;
-        // 1. Bersihkan nama dari spasi/simbol dan ubah ke huruf besar
         const cleanName = nama.replace(/[^a-zA-Z]/g, '').toUpperCase();
-
-        // Validasi panjang nama
         if (cleanName.length < 3) {
             return res.status(400).json({ message: 'Nama harus memiliki setidaknya 3 karakter huruf untuk membuat kode referral.' });
         }
-
-        // 2. Ambil 3 huruf depan dan belakang
         const firstThree = cleanName.slice(0, 3);
         const lastThree = cleanName.slice(-3);
-
-        // 3. Lakukan perulangan hingga kita menemukan kode yang unik
         while (!isCodeUnique) {
             const generateRandomLetters = (length) => {
                 const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -61,40 +51,30 @@ app.post('/api/auth/register', async (req, res) => {
                 }
                 return result;
             };
-            // Buat bagian acak sesuai format
             const randomNumber = Math.floor(Math.random() * 999) + 1; // Angka 1-999
             const randomLetters = generateRandomLetters(3);             // 3 huruf acak A-Z
-
-            // Gabungkan semua bagian menjadi satu kode kandidat
             const candidateCode = `${lastThree}${randomNumber}${firstThree}${randomLetters}`;
-
-            // Periksa apakah kode sudah ada di database
             const codeExists = await prisma.user.findUnique({
                 where: { kodeReferral: candidateCode },
             });
-
-            // Jika tidak ada, kita gunakan kode ini dan hentikan perulangan
             if (!codeExists) {
                 newReferralCode = candidateCode;
                 isCodeUnique = true;
             }
         }
-        // --- AKHIR DARI LOGIKA KODE REFERRAL KUSTOM BARU ---
-
         const hashedPassword = await bcrypt.hash(password, 10);
-
         const newUser = await prisma.user.create({
             data: {
                 nama,
                 email,
                 password: hashedPassword,
-                tglLahir: tglLahir ? new Date(tglLahir) : null, // Simpan tglLahir jika diberikan
+                tglLahir: tglLahir ? new Date(tglLahir) : null,
                 nomorTelepon,
                 kecamatan,
                 domisili,
                 fotoKtp,
                 uplineId,
-                kodeReferral: newReferralCode, // Gunakan kode baru yang kita buat
+                kodeReferral: newReferralCode,
             },
             select: { id: true, nama: true, email: true, kodeReferral: true }
         });
@@ -147,6 +127,7 @@ app.get('/api/users/me', authorize(), async (req, res) => {
             where: { id: req.user.id },
             select: {
                 id: true,
+                role: true,
                 nama: true,
                 email: true,
                 picture: true,
@@ -311,6 +292,109 @@ app.put('/api/admin/users/:id/approve', authorize(['ADMIN']), async (req, res) =
     }
 });
 
+app.put('/api/admin/users/:id/reject', authorize(['ADMIN']), async (req, res) => {
+    try {
+        const updatedUser = await prisma.user.update({
+            where: { id: parseInt(req.params.id) },
+            data: { statusRegistrasi: 'REJECTED' },
+        });
+        res.json({ message: 'Registrasi user berhasil ditolak.', user: updatedUser });
+    } catch (error) {
+        res.status(500).json({ message: 'Gagal menolak registrasi.' });
+    }
+});
+
+app.put('/api/admin/projects/:id', authorize(['ADMIN']), async (req, res) => {
+    const projectId = parseInt(req.params.id);
+    const { namaProyek, nilaiProyek, projectUrl, fields } = req.body;
+
+    try {
+        const updatedProject = await prisma.$transaction(async (tx) => {
+            const project = await tx.project.update({
+                where: { id: projectId },
+                data: {
+                    namaProyek,
+                    nilaiProyek: new Decimal(nilaiProyek),
+                    projectUrl,
+                }
+            });
+
+            await tx.projectField.deleteMany({
+                where: { projectId: projectId },
+            });
+
+            if (fields && fields.length > 0) {
+                await tx.projectField.createMany({
+                    data: fields.map(field => ({
+                        label: field.label,
+                        fieldType: field.fieldType,
+                        projectId: projectId,
+                    })),
+                });
+            }
+
+            return tx.project.findUnique({
+                where: { id: projectId },
+                include: { fields: true },
+            });
+        });
+
+        res.json(updatedProject);
+    } catch (error) {
+        console.error(`Error updating project ${projectId}:`, error);
+        res.status(500).json({ message: 'Gagal memperbarui proyek.' });
+    }
+});
+
+app.delete('/api/admin/projects/:id', authorize(['ADMIN']), async (req, res) => {
+    try {
+        await prisma.project.delete({
+            where: { id: parseInt(req.params.id) }
+        });
+        res.status(204).send();
+    } catch (error) {
+        res.status(500).json({ message: 'Gagal menghapus proyek.' });
+    }
+});
+
+app.get('/api/admin/users', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
+    const { status } = req.query; 
+    try {
+        const whereClause = {};
+        if (status && ['PENDING', 'APPROVED', 'REJECTED'].includes(status)) {
+            whereClause.statusRegistrasi = status;
+        }
+        const users = await prisma.user.findMany({
+            where: whereClause,
+            orderBy: { tglDibuat: 'desc' }
+        });
+        res.json(users);
+    } catch (error) {
+        res.status(500).json({ message: 'Gagal mengambil data pengguna.' });
+    }
+});
+
+app.get('/api/admin/submissions', authorize(['ADMIN']), async (req, res) => {
+    const { status } = req.query;
+    try {
+        const whereClause = {};
+        if (status && ['PENDING', 'APPROVED', 'REJECTED'].includes(status)) {
+            whereClause.status = status;
+        }
+        const submissions = await prisma.submission.findMany({
+            where: whereClause,
+            include: {
+                user: { select: { nama: true } },
+                project: { select: { namaProyek: true } }
+            },
+            orderBy: { tglDibuat: 'desc' }
+        });
+        res.json(submissions);
+    } catch (error) {
+        res.status(500).json({ message: 'Gagal mengambil data submission.' });
+    }
+});
+
 app.put('/api/admin/submissions/:id/approve', authorize(['ADMIN']), async (req, res) => {
     const submissionId = parseInt(req.params.id);
     try {
@@ -375,6 +459,25 @@ app.put('/api/admin/submissions/:id/reject', authorize(['ADMIN']), async (req, r
 // =============================================
 // ROUTES - SUPER ADMIN
 // =============================================
+
+app.get('/api/superadmin/withdrawals', authorize(['SUPER_ADMIN']), async (req, res) => {
+    const { status } = req.query;
+    try {
+        const whereClause = {};
+        if (status && ['PENDING', 'APPROVED', 'REJECTED'].includes(status)) {
+            whereClause.status = status;
+        }
+        const withdrawals = await prisma.withdrawal.findMany({
+            where: whereClause,
+            include: { user: { select: { nama: true } } },
+            orderBy: { tglDiajukan: 'desc' }
+        });
+        res.json(withdrawals);
+    } catch (error) {
+        res.status(500).json({ message: 'Gagal mengambil data penarikan.' });
+    }
+});
+
 app.put('/api/superadmin/withdrawals/:id/approve', authorize(['SUPER_ADMIN']), async (req, res) => {
     const withdrawalId = parseInt(req.params.id);
     try {
