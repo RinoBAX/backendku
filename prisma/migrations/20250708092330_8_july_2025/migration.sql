@@ -1,0 +1,8 @@
+-- AlterTable
+ALTER TABLE `projects` ADD COLUMN `iconUrl` VARCHAR(191) NULL;
+
+-- AlterTable
+ALTER TABLE `transactions` MODIFY `tipe` ENUM('PENGERJAAN_PROYEK', 'KOMISI_UPLINE_1', 'KOMISI_UPLINE_2', 'PENARIKAN_DANA', 'BONUS_OPERASIONAL') NOT NULL;
+
+-- AlterTable
+ALTER TABLE `users` ADD COLUMN `previlegeStatus` BOOLEAN NOT NULL DEFAULT false;

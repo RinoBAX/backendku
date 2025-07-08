@@ -1,4 +1,3 @@
-
 datasource db {
   provider = "mysql"
   url      = env("DATABASE_URL")
@@ -7,6 +6,10 @@ datasource db {
 generator client {
   provider = "prisma-client-js"
 }
+
+// =============================================
+// MODEL PENGGUNA DAN OTENTIKASI
+// =============================================
 
 model User {
   id               Int                @id @default(autoincrement())
@@ -18,7 +21,7 @@ model User {
   kecamatan        String?
   domisili         String?
   fotoKtp          String?
-  tglLahir         DateTime?          // Field tanggal lahir ditambahkan
+  tglLahir         DateTime?
 
   kodeReferral     String             @unique
   uplineId         Int?
@@ -28,6 +31,7 @@ model User {
   balance          Decimal            @default(0) @db.Decimal(12, 2)
   role             Role               @default(USER)
   statusRegistrasi RegistrationStatus @default(PENDING)
+  previlegeStatus  Boolean            @default(false)
 
   projectsCreated  Project[]
   submissions      Submission[]
@@ -40,11 +44,15 @@ model User {
   @@map("users")
 }
 
+// =============================================
+// MODEL PROYEK DAN FIELD DINAMIS
+// =============================================
 
 model Project {
   id          Int      @id @default(autoincrement())
   namaProyek  String
-  nilaiProyek Decimal  @db.Decimal(12, 2) 
+  iconUrl     String?
+  nilaiProyek Decimal  @db.Decimal(12, 2)
   projectUrl  String?
   
   creatorId   Int
@@ -60,8 +68,8 @@ model Project {
 
 model ProjectField {
   id          Int       @id @default(autoincrement())
-  label       String 
-  fieldType   FieldType 
+  label       String
+  fieldType   FieldType
   isRequired  Boolean   @default(true)
 
   projectId   Int
@@ -73,10 +81,14 @@ model ProjectField {
 }
 
 
+// =============================================
+// MODEL SUBMISSION PEKERJAAN
+// =============================================
+
 model Submission {
   id               Int              @id @default(autoincrement())
-  status           SubmissionStatus @default(PENDING) 
-  catatanAdmin     String?          
+  status           SubmissionStatus @default(PENDING)
+  catatanAdmin     String?
 
   userId           Int
   user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -94,7 +106,7 @@ model Submission {
 
 model SubmissionValue {
   id          Int    @id @default(autoincrement())
-  value       String @db.Text 
+  value       String @db.Text
 
   submissionId Int
   submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
@@ -105,6 +117,10 @@ model SubmissionValue {
   @@map("submission_values")
 }
 
+
+// =============================================
+// MODEL FINANSIAL (TRANSAKSI & PENARIKAN)
+// =============================================
 
 model Transaction {
   id              Int             @id @default(autoincrement())
@@ -118,7 +134,7 @@ model Transaction {
   submissionId    Int?
   submission      Submission?     @relation(fields: [submissionId], references: [id], onDelete: SetNull)
 
-  withdrawalId    Int?            @unique 
+  withdrawalId    Int?            @unique
   withdrawal      Withdrawal?     @relation(fields: [withdrawalId], references: [id])
 
   transactionDate DateTime        @default(now())
@@ -129,7 +145,7 @@ model Transaction {
 model Withdrawal {
   id              Int              @id @default(autoincrement())
   totalWithdrawal Decimal          @db.Decimal(12, 2)
-  status          WithdrawalStatus @default(PENDING) 
+  status          WithdrawalStatus @default(PENDING)
 
   userId          Int
   user            User             @relation(fields: [userId], references: [id], onDelete: Restrict)
@@ -142,6 +158,10 @@ model Withdrawal {
   @@map("withdrawals")
 }
 
+
+// =============================================
+// ENUMS (TIPE DATA KUSTOM)
+// =============================================
 
 enum Role {
   USER
@@ -175,8 +195,9 @@ enum WithdrawalStatus {
 }
 
 enum TransactionType {
-  PENGERJAAN_PROYEK 
-  KOMISI_UPLINE_1   
-  KOMISI_UPLINE_2   
-  PENARIKAN_DANA    
+  PENGERJAAN_PROYEK
+  KOMISI_UPLINE_1
+  KOMISI_UPLINE_2
+  PENARIKAN_DANA
+  BONUS_OPERASIONAL
 }
