@@ -248,13 +248,11 @@ app.post('/api/projects/:projectId/submit', authorize(), upload.any(), async (re
 // ROUTES - ADMIN
 // =============================================
 
-app.post('/api/admin/projects', authorize(['ADMIN']), upload.single('icon'), async (req, res) => {
-    // Karena menggunakan multipart/form-data, 'fields' akan menjadi string
-    const { namaProyek, projectUrl, nilaiProyek, fields: fieldsString } = req.body;
+app.post('/api/admin/projects', authorize(['ADMIN']), async (req, res) => {
+    const { namaProyek, iconUrl, projectUrl, nilaiProyek, fields } = req.body;
     const creatorId = req.user.id;
 
     try {
-        const fields = JSON.parse(fieldsString || '[]');
         if (!namaProyek || !nilaiProyek || !fields || !Array.isArray(fields)) {
             return res.status(400).json({ message: 'Data tidak lengkap.' });
         }
@@ -265,19 +263,13 @@ app.post('/api/admin/projects', authorize(['ADMIN']), upload.single('icon'), asy
                 projectUrl,
                 nilaiProyek: new Decimal(nilaiProyek),
                 creatorId,
-                // Handle ikon yang diunggah (opsional)
-                iconUrl: req.file ? req.file.path : null,
+                iconUrl: iconUrl || null,
                 fields: {
-                    create: fields.map(field => {
-                        if (!field.label || !field.fieldType) {
-                            throw new Error('Setiap field harus memiliki label dan fieldType.');
-                        }
-                        return {
-                            label: field.label,
-                            fieldType: field.fieldType,
-                            isRequired: field.isRequired || true,
-                        };
-                    })
+                    create: fields.map(field => ({
+                        label: field.label,
+                        fieldType: field.fieldType,
+                        isRequired: field.isRequired || true,
+                    }))
                 }
             },
             include: { fields: true },
@@ -286,6 +278,34 @@ app.post('/api/admin/projects', authorize(['ADMIN']), upload.single('icon'), asy
     } catch (error) {
         console.error('Error saat membuat proyek:', error);
         res.status(500).json({ message: 'Gagal membuat proyek baru.' });
+    }
+});
+
+app.put('/api/admin/users/:id', authorize(['ADMIN', 'SUPER_ADMIN']), upload.single('picture'), async (req, res) => {
+    const userId = parseInt(req.params.id);
+    const { nama, email, role, balance } = req.body;
+
+    try {
+        const dataToUpdate = {
+            nama,
+            email,
+            role,
+            balance: new Decimal(balance)
+        };
+
+        if (req.file) {
+            dataToUpdate.picture = req.file.path;
+        }
+
+        const updatedUser = await prisma.user.update({
+            where: { id: userId },
+            data: dataToUpdate,
+        });
+
+        res.json(updatedUser);
+    } catch (error) {
+        console.error(`Error updating user ${userId}:`, error);
+        res.status(500).json({ message: 'Gagal memperbarui data pengguna.' });
     }
 });
 
@@ -313,25 +333,20 @@ app.put('/api/admin/users/:id/reject', authorize(['ADMIN']), async (req, res) =>
     }
 });
 
-app.put('/api/admin/projects/:id', authorize(['ADMIN']), upload.single('icon'), async (req, res) => {
+app.put('/api/admin/projects/:id', authorize(['ADMIN']), async (req, res) => {
     const projectId = parseInt(req.params.id);
-    const { namaProyek, nilaiProyek, projectUrl, fields: fieldsString } = req.body;
+    const { namaProyek, iconUrl, nilaiProyek, projectUrl, fields } = req.body;
 
     try {
-        const fields = JSON.parse(fieldsString || '[]');
         const updatedProject = await prisma.$transaction(async (tx) => {
-            const dataToUpdate = {
-                namaProyek,
-                nilaiProyek: new Decimal(nilaiProyek),
-                projectUrl,
-            };
-            if (req.file) {
-                dataToUpdate.iconUrl = req.file.path;
-            }
-
             await tx.project.update({
                 where: { id: projectId },
-                data: dataToUpdate
+                data: {
+                    namaProyek,
+                    nilaiProyek: new Decimal(nilaiProyek),
+                    projectUrl,
+                    iconUrl: iconUrl || null,
+                }
             });
 
             await tx.projectField.deleteMany({
