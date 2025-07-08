@@ -293,7 +293,6 @@ app.put('/api/admin/users/:id', authorize(['ADMIN', 'SUPER_ADMIN']), upload.sing
             balance: new Decimal(balance)
         };
 
-        // Jika ada file gambar baru yang diunggah, tambahkan ke data update
         if (req.file) {
             dataToUpdate.picture = req.file.path;
         }
