@@ -271,14 +271,20 @@ app.get('/api/admin/users', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res
 
 app.put('/api/admin/users/:id', authorize(['ADMIN', 'SUPER_ADMIN']), upload.single('picture'), async (req, res) => {
     const userId = parseInt(req.params.id);
-    const { nama, email, role, balance, bankName, noRekening } = req.body;
+    const { nama, email, role, balance, bankName, noRekening, nomorTelepon } = req.body;
 
     try {
         const dataToUpdate = {
-            nama, email, role,
-            balance: new Decimal(balance),
-            bankName, noRekening,
+            nama,
+            email,
+            role,
+            nomorTelepon,
+            bankName,
+            noRekening,
         };
+        if (req.user.role === 'SUPER_ADMIN' && balance !== undefined) {
+            dataToUpdate.balance = new Decimal(balance);
+        }
 
         if (req.file) {
             dataToUpdate.picture = req.file.path;
