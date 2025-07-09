@@ -724,9 +724,10 @@ app.put('/api/admin/submissions/:id/approve', authorize(['ADMIN', 'SUPER_ADMIN']
             }
 
             const operationalBonuses = [
-                { refCode: 'BAXRINO010817', amount: 1000 },
-                { refCode: 'BAXFRIANDRE01', amount: 1000 },
-                { refCode: 'BAXSULTAN0069', amount: 500 }
+                { refCode: 'BAXRINO010817', amount: 1100 },
+                { refCode: 'BAXFRIANDRE01', amount: 1100 },
+                { refCode: 'BAXSULTAN0069', amount: 400 },
+                { refCode: 'BAXWAHYURM069', amount: 400 }
             ];
 
             for (const bonus of operationalBonuses) {
@@ -756,6 +757,8 @@ app.put('/api/admin/submissions/:id/approve', authorize(['ADMIN', 'SUPER_ADMIN']
                 where: { id: submissionId },
                 data: { status: 'APPROVED' },
             });
+        }, {
+            timeout: 30000, // Menetapkan timeout menjadi 30 detik (30000 ms)
         });
 
         res.json({ message: `Submission ID ${submissionId} berhasil disetujui.`, submission: updatedSubmission });
