@@ -133,6 +133,49 @@ app.get('/api/users/me', authorize(), async (req, res) => {
     }
 });
 
+app.put('/api/users/me', authorize(), async (req, res) => {
+    const userId = req.user.id;
+    // Ambil hanya field yang diizinkan untuk diubah oleh pengguna
+    const { nama, password, nomorTelepon, kecamatan, domisili, tglLahir } = req.body;
+
+    try {
+        const dataToUpdate = {};
+
+        // Hanya update field yang dikirim oleh user
+        if (nama) dataToUpdate.nama = nama;
+        if (nomorTelepon) dataToUpdate.nomorTelepon = nomorTelepon;
+        if (kecamatan) dataToUpdate.kecamatan = kecamatan;
+        if (domisili) dataToUpdate.domisili = domisili;
+        if (tglLahir) dataToUpdate.tglLahir = new Date(tglLahir);
+
+        // Jika pengguna mengirim password baru, hash dan update
+        if (password) {
+            const hashedPassword = await bcrypt.hash(password, 10);
+            dataToUpdate.password = hashedPassword;
+        }
+
+        const updatedUser = await prisma.user.update({
+            where: { id: userId },
+            data: dataToUpdate,
+            select: { // Pilih field yang aman untuk dikembalikan
+                id: true,
+                nama: true,
+                email: true,
+                picture: true,
+                nomorTelepon: true,
+                kecamatan: true,
+                domisili: true,
+                tglLahir: true
+            }
+        });
+
+        res.json(updatedUser);
+    } catch (error) {
+        console.error(`Error updating profile for user ${userId}:`, error);
+        res.status(500).json({ message: 'Gagal memperbarui profil.' });
+    }
+});
+
 app.put('/api/users/me/picture', authorize(), upload.single('picture'), async (req, res) => {
     if (!req.file) {
         return res.status(400).json({ message: 'Tidak ada file gambar yang diunggah.' });
