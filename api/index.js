@@ -72,7 +72,7 @@ app.post('/api/auth/login', async (req, res) => {
         const isPasswordValid = await bcrypt.compare(password, user.password);
         if (!isPasswordValid) return res.status(401).json({ message: 'Email atau password salah.' });
         const userPayload = { userId: user.id };
-        const accessToken = jwt.sign(userPayload, process.env.JWT_SECRET, { expiresIn: '1d' });
+        const accessToken = jwt.sign(userPayload, process.env.JWT_SECRET, { expiresIn: '4h' });
         res.json({ accessToken });
     } catch (error) {
         console.error('Error saat login:', error);
