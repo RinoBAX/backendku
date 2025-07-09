@@ -73,7 +73,9 @@ app.post('/api/auth/login', async (req, res) => {
         if (!isPasswordValid) return res.status(401).json({ message: 'Email atau password salah.' });
         const userPayload = { userId: user.id };
         const accessToken = jwt.sign(userPayload, process.env.JWT_SECRET, { expiresIn: '4h' });
-        res.json({ accessToken });
+        res.json({ 
+            ...user,
+            accessToken });
     } catch (error) {
         console.error('Error saat login:', error);
         res.status(500).json({ message: 'Terjadi kesalahan pada server.' });
@@ -138,7 +140,7 @@ app.put('/api/users/me/picture', authorize(), upload.single('picture'), async (r
     try {
         const updatedUser = await prisma.user.update({
             where: { id: req.user.id },
-            data: { picture: req.file.location } 
+            data: { picture: req.file.location }
         });
         res.json({ message: 'Foto profil berhasil diperbarui.', pictureUrl: updatedUser.picture });
     } catch (error) {
@@ -169,13 +171,13 @@ app.get('/api/projects', authorize(), async (req, res) => {
         ]);
 
         res.json({
-            data: projects,
             pagination: {
                 totalItems,
                 totalPages: Math.ceil(totalItems / pageSize),
                 currentPage: page,
                 pageSize,
-            }
+            },
+            data: projects
         });
     } catch (error) {
         res.status(500).json({ message: 'Gagal mengambil data proyek.' });
@@ -215,7 +217,7 @@ app.post('/api/projects/:projectId/submit', authorize(), upload.any(), async (re
                 req.files.forEach(file => {
                     if (fieldMap.has(file.fieldname)) {
                         submissionValues.push({
-                            value: file.location, 
+                            value: file.location,
                             submissionId: newSubmission.id,
                             projectFieldId: parseInt(file.fieldname),
                         });
@@ -287,7 +289,7 @@ app.put('/api/admin/users/:id', authorize(['ADMIN', 'SUPER_ADMIN']), upload.sing
             bankName,
             noRekening,
         };
-        
+
         if (req.user.role === 'SUPER_ADMIN' && balance !== undefined) {
             dataToUpdate.balance = new Decimal(balance);
         }
@@ -458,6 +460,62 @@ app.get('/api/admin/submissions', authorize(['ADMIN']), async (req, res) => {
         });
     } catch (error) {
         res.status(500).json({ message: 'Gagal mengambil data submission.' });
+    }
+});
+
+app.get('/api/users/me/submissions', authorize(), async (req, res) => {
+    const userId = req.user.id; 
+    const page = parseInt(req.query.page) || 1;
+    const pageSize = parseInt(req.query.perPage) || 10;
+    const skip = (page - 1) * pageSize;
+
+    try {
+        const [submissions, totalItems] = await prisma.$transaction([
+            prisma.submission.findMany({
+                where: { userId: userId },
+                include: {
+                    project: {
+                        select: {
+                            namaProyek: true
+                        }
+                    },
+                    values: {
+                        select: {
+                            value: true,
+                            projectField: {
+                                select: {
+                                    label: true
+                                }
+                            }
+                        }
+                    }
+                },
+                orderBy: { tglDibuat: 'desc' },
+                skip: skip,
+                take: pageSize
+            }),
+            prisma.submission.count({
+                where: { userId: userId }
+            })
+        ]);
+
+        const totalPages = Math.ceil(totalItems / pageSize);
+
+        res.status(200).json({
+            success: true,
+            message: "Report found",
+            result: {
+                totalItems: totalItems,
+                totalPages: totalPages,
+                perPage: pageSize,
+                currentPage: page,
+                data: submissions
+            }
+        });
+
+    } catch (error) {
+        console.error(`Error fetching submissions for user ${userId}:`, error);
+        res.status(500).json({ success: false, message: 'Failed to fetch user report.' });
     }
 });
 
@@ -662,6 +720,11 @@ app.put('/api/superadmin/withdrawals/:id/approve', authorize(['SUPER_ADMIN']), a
     } catch (error) {
         res.status(500).json({ message: error.message || 'Gagal menyetujui penarikan.' });
     }
+});
+
+const PORT = process.env.PORT || 6969;
+app.listen(PORT, () => {
+    console.log(`Server berjalan di http://localhost:${PORT}`);
 });
 
 module.exports = app;
