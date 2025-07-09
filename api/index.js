@@ -52,7 +52,7 @@ app.post('/api/auth/register', async (req, res) => {
                 nama, email, password: hashedPassword, tglLahir: tglLahir ? new Date(tglLahir) : null,
                 nomorTelepon, kecamatan, domisili, fotoKtp, uplineId, kodeReferral: newReferralCode,
                 bankName: bankName || 'EMPTY',
-                noRekening,
+                noRekening
             },
             select: { id: true, nama: true, email: true, kodeReferral: true }
         });
@@ -79,6 +79,66 @@ app.post('/api/auth/login', async (req, res) => {
     } catch (error) {
         console.error('Error saat login:', error);
         res.status(500).json({ message: 'Terjadi kesalahan pada server.' });
+    }
+});
+
+app.get('/api/auth/check-token', authorize(), async (req, res) => {
+    const { password, ...userData } = req.user; 
+    
+    res.status(200).json({
+        success: true,
+        message: "Token is valid.",
+        user: userData
+    });
+});
+
+
+app.get('/api/users/downline/:id', authorize(), async (req, res) => {
+    const targetUserId = parseInt(req.params.id);
+    const page = parseInt(req.query.page) || 1;
+    const pageSize = parseInt(req.query.perPage) || 10;
+    const skip = (page - 1) * pageSize;
+
+    try {
+        const [downlines, totalItems] = await prisma.$transaction([
+            prisma.user.findMany({
+                where: {
+                    uplineId: targetUserId,
+                },
+                select: {
+                    id: true,
+                    nama: true,
+                    email: true,
+                },
+                orderBy: {
+                    tglDibuat: 'desc',
+                },
+                skip: skip,
+                take: pageSize,
+            }),
+            prisma.user.count({
+                where: {
+                    uplineId: targetUserId,
+                },
+            }),
+        ]);
+
+        const totalPages = Math.ceil(totalItems / pageSize);
+
+        res.status(200).json({
+            success: true,
+            message: 'Downline found',
+            result: {
+                totalItems,
+                totalPages,
+                perPage: pageSize,
+                currentPage: page,
+                data: downlines,
+            },
+        });
+    } catch (error) {
+        console.error(`Error fetching downlines for user ${targetUserId}:`, error);
+        res.status(500).json({ success: false, message: 'Failed to fetch downline data.' });
     }
 });
 
@@ -135,20 +195,16 @@ app.get('/api/users/me', authorize(), async (req, res) => {
 
 app.put('/api/users/me', authorize(), async (req, res) => {
     const userId = req.user.id;
-    // Ambil hanya field yang diizinkan untuk diubah oleh pengguna
     const { nama, password, nomorTelepon, kecamatan, domisili, tglLahir } = req.body;
 
     try {
         const dataToUpdate = {};
-
-        // Hanya update field yang dikirim oleh user
         if (nama) dataToUpdate.nama = nama;
         if (nomorTelepon) dataToUpdate.nomorTelepon = nomorTelepon;
         if (kecamatan) dataToUpdate.kecamatan = kecamatan;
         if (domisili) dataToUpdate.domisili = domisili;
         if (tglLahir) dataToUpdate.tglLahir = new Date(tglLahir);
 
-        // Jika pengguna mengirim password baru, hash dan update
         if (password) {
             const hashedPassword = await bcrypt.hash(password, 10);
             dataToUpdate.password = hashedPassword;
@@ -157,7 +213,7 @@ app.put('/api/users/me', authorize(), async (req, res) => {
         const updatedUser = await prisma.user.update({
             where: { id: userId },
             data: dataToUpdate,
-            select: { // Pilih field yang aman untuk dikembalikan
+            select: { 
                 id: true,
                 nama: true,
                 email: true,
@@ -764,10 +820,10 @@ app.put('/api/superadmin/withdrawals/:id/approve', authorize(['SUPER_ADMIN']), a
         res.status(500).json({ message: error.message || 'Gagal menyetujui penarikan.' });
     }
 });
-
+/*
 const PORT = process.env.PORT || 6969;
 app.listen(PORT, () => {
     console.log(`Server berjalan di http://localhost:${PORT}`);
 });
-
+*/
 module.exports = app;
