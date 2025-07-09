@@ -176,15 +176,35 @@ app.put('/api/users/me/picture', authorize(), upload.single('picture'), async (r
 // =============================================
 
 app.get('/api/projects', authorize(), async (req, res) => {
+    // DIUBAH: Menambahkan logika paginasi
+    const page = parseInt(req.query.page) || 1;
+    const pageSize = parseInt(req.query.pageSize) || 10;
+    const skip = (page - 1) * pageSize;
+
     try {
-        const projects = await prisma.project.findMany({
-            include: { 
-                fields: true,
-                creator: { select: { nama: true }},
-                submissions: { select: { status: true }} 
+        const [projects, totalItems] = await prisma.$transaction([
+            prisma.project.findMany({
+                include: { 
+                    fields: true,
+                    creator: { select: { nama: true }},
+                    submissions: { select: { status: true }} 
+                },
+                skip: skip,
+                take: pageSize,
+                orderBy: { tglDibuat: 'desc' }
+            }),
+            prisma.project.count()
+        ]);
+        
+        res.json({
+            data: projects,
+            pagination: {
+                totalItems,
+                totalPages: Math.ceil(totalItems / pageSize),
+                currentPage: page,
+                pageSize,
             }
         });
-        res.json(projects);
     } catch (error) {
         res.status(500).json({ message: 'Gagal mengambil data proyek.' });
     }
