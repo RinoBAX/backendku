@@ -5,16 +5,15 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { PrismaClient, Prisma } = require('@prisma/client');
 const { Decimal } = require('@prisma/client/runtime/library');
-const authorize = require('./middleware/auth');
-const { upload } = require('./config/cloudinary');
+const authorize = require('./middleware/auth'); 
+const { upload } = require('./config/cloudinary'); 
 
 const prisma = new PrismaClient();
 const app = express();
-
 app.use(cors());
 app.use(express.json());
+
 app.post('/api/auth/register', async (req, res) => {
-  // DITAMBAHKAN: Menerima data bank dari body
   const { nama, email, password, tglLahir, nomorTelepon, kecamatan, domisili, fotoKtp, bankName, noRekening, kodeReferralUpline } = req.body;
   try {
     if (!nama || !email || !password) {
@@ -52,7 +51,6 @@ app.post('/api/auth/register', async (req, res) => {
       data: {
         nama, email, password: hashedPassword, tglLahir: tglLahir ? new Date(tglLahir) : null,
         nomorTelepon, kecamatan, domisili, fotoKtp, uplineId, kodeReferral: newReferralCode,
-        // DITAMBAHKAN: Menyimpan data bank
         bankName: bankName || 'EMPTY',
         noRekening,
       },
@@ -69,36 +67,20 @@ app.post('/api/auth/login', async (req, res) => {
     const { email, password } = req.body;
     try {
         const user = await prisma.user.findUnique({ where: { email } });
-        if (!user) {
-            return res.status(401).json({ message: 'Email atau password salah.' });
-        }
-
-        if (user.statusRegistrasi !== 'APPROVED') {
-            return res.status(403).json({ message: 'Akun Anda belum disetujui oleh admin.' });
-        }
-
+        if (!user) return res.status(401).json({ message: 'Email atau password salah.' });
+        if (user.statusRegistrasi !== 'APPROVED') return res.status(403).json({ message: 'Akun Anda belum disetujui oleh admin.' });
         const isPasswordValid = await bcrypt.compare(password, user.password);
-        if (!isPasswordValid) {
-            return res.status(401).json({ message: 'Email atau password salah.' });
-        }
-
+        if (!isPasswordValid) return res.status(401).json({ message: 'Email atau password salah.' });
         const userPayload = { userId: user.id };
-
         const accessToken = jwt.sign(userPayload, process.env.JWT_SECRET, { expiresIn: '1d' });
         res.json({ accessToken });
-
     } catch (error) {
         console.error('Error saat login:', error);
         res.status(500).json({ message: 'Terjadi kesalahan pada server.' });
     }
 });
 
-// =============================================
-// ROUTES - USER
-// =============================================
-
 app.get('/api/users/me', authorize(), async (req, res) => {
-    // DITAMBAHKAN: Logika paginasi untuk relasi
     const submissionPage = parseInt(req.query.submissionPage) || 1;
     const downlinePage = parseInt(req.query.downlinePage) || 1;
     const pageSize = parseInt(req.query.pageSize) || 10;
@@ -111,21 +93,18 @@ app.get('/api/users/me', authorize(), async (req, res) => {
                 domisili: true, balance: true, kodeReferral: true, role: true, previlegeStatus: true,
                 bankName: true, noRekening: true,
                 upline: { select: { id: true, nama: true, email: true } },
-                transactions: { orderBy: { transactionDate: 'desc' }, take: 20 }, // Ambil 20 transaksi terakhir
-                // DITAMBAHKAN: Paginasi untuk downlines
+                transactions: { orderBy: { transactionDate: 'desc' }, take: 20 },
                 downlines: { 
                     skip: (downlinePage - 1) * pageSize,
                     take: pageSize,
                     select: { id: true, nama: true, email: true } 
                 },
-                // DITAMBAHKAN: Paginasi untuk submissions
                 submissions: { 
                     skip: (submissionPage - 1) * pageSize,
                     take: pageSize,
                     orderBy: { tglDibuat: 'desc' }, 
                     include: { project: { select: { namaProyek: true }} } 
                 },
-                // DITAMBAHKAN: Hitung total untuk paginasi
                 _count: {
                     select: {
                         downlines: true,
@@ -136,7 +115,6 @@ app.get('/api/users/me', authorize(), async (req, res) => {
         });
         if (!user) return res.status(404).json({ message: 'User tidak ditemukan.' });
         
-        // Mengubah struktur respons agar lebih mudah dikelola di frontend
         const response = {
             profile: {
                 ...user,
@@ -144,7 +122,7 @@ app.get('/api/users/me', authorize(), async (req, res) => {
                 totalSubmissions: user._count.submissions
             },
         };
-        delete response.profile._count; // Hapus properti _count yang tidak perlu
+        delete response.profile._count;
 
         res.json(response);
     } catch (error) {
@@ -154,10 +132,7 @@ app.get('/api/users/me', authorize(), async (req, res) => {
 });
 
 app.put('/api/users/me/picture', authorize(), upload.single('picture'), async (req, res) => {
-    if (!req.file) {
-        return res.status(400).json({ message: 'Tidak ada file gambar yang diunggah.' });
-    }
-
+    if (!req.file) return res.status(400).json({ message: 'Tidak ada file gambar yang diunggah.' });
     try {
         const updatedUser = await prisma.user.update({
             where: { id: req.user.id },
@@ -165,18 +140,11 @@ app.put('/api/users/me/picture', authorize(), upload.single('picture'), async (r
         });
         res.json({ message: 'Foto profil berhasil diperbarui.', pictureUrl: updatedUser.picture });
     } catch (error) {
-        console.error('Error update picture:', error);
         res.status(500).json({ message: 'Gagal memperbarui foto profil.' });
     }
 });
 
-
-// =============================================
-// ROUTES - PROJECTS & SUBMISSIONS
-// =============================================
-
 app.get('/api/projects', authorize(), async (req, res) => {
-    // DIUBAH: Menambahkan logika paginasi
     const page = parseInt(req.query.page) || 1;
     const pageSize = parseInt(req.query.pageSize) || 10;
     const skip = (page - 1) * pageSize;
@@ -264,47 +232,45 @@ app.post('/api/projects/:projectId/submit', authorize(), upload.any(), async (re
     }
 });
 
-
-// =============================================
-// ROUTES - ADMIN
-// =============================================
-
-app.post('/api/admin/projects', authorize(['ADMIN']), async (req, res) => {
-    // DITAMBAHKAN: Menerima deskripsi
-    const { namaProyek, iconUrl, projectUrl, nilaiProyek, deskripsi, fields } = req.body;
-    const creatorId = req.user.id;
+app.get('/api/admin/users', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
+    const { status } = req.query; 
+    const page = parseInt(req.query.page) || 1;
+    const pageSize = parseInt(req.query.pageSize) || 10;
+    const skip = (page - 1) * pageSize;
 
     try {
-        if (!namaProyek || !nilaiProyek || !fields || !Array.isArray(fields)) {
-            return res.status(400).json({ message: 'Data tidak lengkap.' });
+        const whereClause = {};
+        if (status && ['PENDING', 'APPROVED', 'REJECTED'].includes(status)) {
+            whereClause.statusRegistrasi = status;
         }
 
-        const newProject = await prisma.project.create({
-            data: {
-                namaProyek, projectUrl, deskripsi,
-                nilaiProyek: new Decimal(nilaiProyek),
-                creatorId,
-                iconUrl: iconUrl || null,
-                fields: {
-                    create: fields.map(field => ({
-                        label: field.label,
-                        fieldType: field.fieldType,
-                        isRequired: field.isRequired || true,
-                    }))
-                }
-            },
-            include: { fields: true },
+        const [users, totalItems] = await prisma.$transaction([
+            prisma.user.findMany({
+                where: whereClause,
+                include: { submissions: { select: { id: true } } },
+                orderBy: { tglDibuat: 'desc' },
+                skip: skip,
+                take: pageSize,
+            }),
+            prisma.user.count({ where: whereClause })
+        ]);
+        
+        res.json({
+            data: users,
+            pagination: {
+                totalItems,
+                totalPages: Math.ceil(totalItems / pageSize),
+                currentPage: page,
+                pageSize,
+            }
         });
-        res.status(201).json(newProject);
     } catch (error) {
-        console.error('Error saat membuat proyek:', error);
-        res.status(500).json({ message: 'Gagal membuat proyek baru.' });
+        res.status(500).json({ message: 'Gagal mengambil data pengguna.' });
     }
 });
 
 app.put('/api/admin/users/:id', authorize(['ADMIN', 'SUPER_ADMIN']), upload.single('picture'), async (req, res) => {
     const userId = parseInt(req.params.id);
-    // DITAMBAHKAN: Menerima data bank
     const { nama, email, role, balance, bankName, noRekening } = req.body;
 
     try {
@@ -354,9 +320,40 @@ app.put('/api/admin/users/:id/reject', authorize(['ADMIN']), async (req, res) =>
     }
 });
 
+app.post('/api/admin/projects', authorize(['ADMIN']), async (req, res) => {
+    const { namaProyek, iconUrl, projectUrl, nilaiProyek, deskripsi, fields } = req.body;
+    const creatorId = req.user.id;
+
+    try {
+        if (!namaProyek || !nilaiProyek || !fields || !Array.isArray(fields)) {
+            return res.status(400).json({ message: 'Data tidak lengkap.' });
+        }
+
+        const newProject = await prisma.project.create({
+            data: {
+                namaProyek, projectUrl, deskripsi,
+                nilaiProyek: new Decimal(nilaiProyek),
+                creatorId,
+                iconUrl: iconUrl || null,
+                fields: {
+                    create: fields.map(field => ({
+                        label: field.label,
+                        fieldType: field.fieldType,
+                        isRequired: field.isRequired || true,
+                    }))
+                }
+            },
+            include: { fields: true },
+        });
+        res.status(201).json(newProject);
+    } catch (error) {
+        console.error('Error saat membuat proyek:', error);
+        res.status(500).json({ message: 'Gagal membuat proyek baru.' });
+    }
+});
+
 app.put('/api/admin/projects/:id', authorize(['ADMIN']), async (req, res) => {
     const projectId = parseInt(req.params.id);
-    // DITAMBAHKAN: Menerima deskripsi
     const { namaProyek, iconUrl, nilaiProyek, projectUrl, deskripsi, fields } = req.body;
 
     try {
@@ -364,11 +361,32 @@ app.put('/api/admin/projects/:id', authorize(['ADMIN']), async (req, res) => {
             await tx.project.update({
                 where: { id: projectId },
                 data: {
-                    namaProyek, nilaiProyek: new Decimal(nilaiProyek),
-                    projectUrl, iconUrl: iconUrl || null, deskripsi,
+                    namaProyek,
+                    nilaiProyek: new Decimal(nilaiProyek),
+                    projectUrl,
+                    iconUrl: iconUrl || null,
+                    deskripsi,
                 }
             });
-            // ... sisa logika tidak berubah ...
+
+            await tx.projectField.deleteMany({
+                where: { projectId: projectId },
+            });
+
+            if (fields && fields.length > 0) {
+                await tx.projectField.createMany({
+                    data: fields.map(field => ({
+                        label: field.label,
+                        fieldType: field.fieldType,
+                        projectId: projectId,
+                    })),
+                });
+            }
+
+            return tx.project.findUnique({
+                where: { id: projectId },
+                include: { fields: true },
+            });
         });
         res.json(updatedProject);
     } catch (error) {
@@ -382,48 +400,13 @@ app.delete('/api/admin/projects/:id', authorize(['ADMIN']), async (req, res) => 
         await prisma.project.delete({
             where: { id: parseInt(req.params.id) }
         });
-        res.status(204).send(); // No Content
+        res.status(200).json({ message: 'Proyek berhasil dihapus.' });
     } catch (error) {
+        console.error(`Gagal menghapus proyek: ${req.params.id}`, error);
         res.status(500).json({ message: 'Gagal menghapus proyek.' });
     }
 });
 
-app.get('/api/admin/users', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
-    const { status } = req.query; 
-    const page = parseInt(req.query.page) || 1;
-    const pageSize = parseInt(req.query.pageSize) || 10;
-    const skip = (page - 1) * pageSize;
-
-    try {
-        const whereClause = {};
-        if (status && ['PENDING', 'APPROVED', 'REJECTED'].includes(status)) {
-            whereClause.statusRegistrasi = status;
-        }
-
-        const [users, totalItems] = await prisma.$transaction([
-            prisma.user.findMany({
-                where: whereClause,
-                include: { submissions: { select: { id: true } } },
-                orderBy: { tglDibuat: 'desc' },
-                skip: skip,
-                take: pageSize,
-            }),
-            prisma.user.count({ where: whereClause })
-        ]);
-        
-        res.json({
-            data: users,
-            pagination: {
-                totalItems,
-                totalPages: Math.ceil(totalItems / pageSize),
-                currentPage: page,
-                pageSize,
-            }
-        });
-    } catch (error) {
-        res.status(500).json({ message: 'Gagal mengambil data pengguna.' });
-    }
-});
 
 app.get('/api/admin/submissions', authorize(['ADMIN']), async (req, res) => {
     const { status } = req.query;
@@ -492,11 +475,11 @@ app.get('/api/admin/submissions/:id', authorize(['ADMIN']), async (req, res) => 
     }
 });
 
+
 app.put('/api/admin/submissions/:id/approve', authorize(['ADMIN']), async (req, res) => {
     const submissionId = parseInt(req.params.id);
     try {
         const updatedSubmission = await prisma.$transaction(async (tx) => {
-            // 1. Ambil data submission, proyek, dan user (termasuk 2 level upline)
             const submission = await tx.submission.findUnique({
                 where: { id: submissionId },
                 include: {
@@ -519,7 +502,6 @@ app.put('/api/admin/submissions/:id/approve', authorize(['ADMIN']), async (req, 
             const { user: pengerja, project } = submission;
             const nilaiProyek = new Decimal(project.nilaiProyek);
 
-            // 2. Tambah saldo & buat transaksi untuk pengerja
             await tx.user.update({
                 where: { id: pengerja.id },
                 data: { balance: { increment: nilaiProyek } },
@@ -534,10 +516,9 @@ app.put('/api/admin/submissions/:id/approve', authorize(['ADMIN']), async (req, 
                 }
             });
 
-            // 3. Proses komisi untuk Upline Level 1
             const uplineL1 = pengerja.upline;
             if (uplineL1) {
-                const komisiL1 = nilaiProyek.mul(0.10); // Komisi 10%
+                const komisiL1 = nilaiProyek.mul(0.10);
                 await tx.user.update({ where: { id: uplineL1.id }, data: { balance: { increment: komisiL1 } } });
                 await tx.transaction.create({ 
                     data: { 
@@ -549,10 +530,9 @@ app.put('/api/admin/submissions/:id/approve', authorize(['ADMIN']), async (req, 
                     } 
                 });
 
-                // 4. Proses komisi untuk Upline Level 2
                 const uplineL2 = uplineL1.upline;
                 if (uplineL2) {
-                    const komisiL2 = nilaiProyek.mul(0.01); // Komisi 1%
+                    const komisiL2 = nilaiProyek.mul(0.01);
                     await tx.user.update({ where: { id: uplineL2.id }, data: { balance: { increment: komisiL2 } } });
                     await tx.transaction.create({ 
                         data: { 
@@ -608,6 +588,7 @@ app.put('/api/admin/submissions/:id/approve', authorize(['ADMIN']), async (req, 
     }
 });
 
+
 app.put('/api/admin/submissions/:id/reject', authorize(['ADMIN']), async (req, res) => {
     const { catatanAdmin } = req.body;
     try {
@@ -620,11 +601,6 @@ app.put('/api/admin/submissions/:id/reject', authorize(['ADMIN']), async (req, r
         res.status(500).json({ message: 'Gagal menolak submission.' });
     }
 });
-
-
-// =============================================
-// ROUTES - SUPER ADMIN
-// =============================================
 
 app.get('/api/superadmin/withdrawals', authorize(['SUPER_ADMIN']), async (req, res) => {
     const { status } = req.query;
@@ -653,7 +629,7 @@ app.put('/api/superadmin/withdrawals/:id/approve', authorize(['SUPER_ADMIN']), a
             if (!withdrawal) throw new Error('Permintaan penarikan tidak ditemukan.');
             if (withdrawal.status !== 'PENDING') throw new Error('Permintaan ini sudah diproses.');
 
-            const user = await tx.user.findUnique({ where: { id: withdrawal.userId } });
+            const user = await tx.user.findUnique({ where: {id: withdrawal.userId }});
             if (new Decimal(user.balance).lessThan(withdrawal.totalWithdrawal)) {
                 throw new Error('Saldo pengguna tidak mencukupi untuk penarikan ini.');
             }
@@ -675,13 +651,9 @@ app.put('/api/superadmin/withdrawals/:id/approve', authorize(['SUPER_ADMIN']), a
     }
 });
 
-
-// =============================================
-// SERVER START
-// =============================================
 const PORT = process.env.PORT || 6969;
 app.listen(PORT, () => {
-    console.log(`Server berjalan di http://localhost:${PORT}`);
+  console.log(`Server berjalan di http://localhost:${PORT}`);
 });
 
 module.exports = app;
