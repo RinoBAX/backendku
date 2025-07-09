@@ -73,9 +73,10 @@ app.post('/api/auth/login', async (req, res) => {
         if (!isPasswordValid) return res.status(401).json({ message: 'Email atau password salah.' });
         const userPayload = { userId: user.id };
         const accessToken = jwt.sign(userPayload, process.env.JWT_SECRET, { expiresIn: '4h' });
-        res.json({ 
+        res.json({
             ...user,
-            accessToken });
+            accessToken
+        });
     } catch (error) {
         console.error('Error saat login:', error);
         res.status(500).json({ message: 'Terjadi kesalahan pada server.' });
@@ -86,15 +87,15 @@ app.get('/api/auth/check-token', authorize(), async (req, res) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
 
-    const { 
-        password, 
-        tglLahir, 
-        fotoKtp, 
-        previlegeStatus, 
-        ...userData 
+    const {
+        password,
+        tglLahir,
+        fotoKtp,
+        previlegeStatus,
+        ...userData
     } = req.user;
     res.status(200).json({
-        accessToken: token, 
+        accessToken: token,
         user: userData
     });
 });
@@ -147,6 +148,8 @@ app.get('/api/users/downline/:id', authorize(), async (req, res) => {
         console.error(`Error fetching downlines for user ${targetUserId}:`, error);
         res.status(500).json({ success: false, message: 'Failed to fetch downline data.' });
     }
+}, {
+    timeout: 30000, 
 });
 
 app.get('/api/users/me', authorize(), async (req, res) => {
@@ -220,7 +223,7 @@ app.put('/api/users/me', authorize(), async (req, res) => {
         const updatedUser = await prisma.user.update({
             where: { id: userId },
             data: dataToUpdate,
-            select: { 
+            select: {
                 id: true,
                 nama: true,
                 email: true,
@@ -237,6 +240,8 @@ app.put('/api/users/me', authorize(), async (req, res) => {
         console.error(`Error updating profile for user ${userId}:`, error);
         res.status(500).json({ message: 'Gagal memperbarui profil.' });
     }
+}, {
+    timeout: 30000,
 });
 
 app.put('/api/users/me/picture', authorize(), upload.single('picture'), async (req, res) => {
@@ -253,6 +258,8 @@ app.put('/api/users/me/picture', authorize(), upload.single('picture'), async (r
         console.error('Gagal memperbarui foto profil:', error);
         res.status(500).json({ message: 'Gagal memperbarui foto profil.' });
     }
+}, {
+    timeout: 30000,
 });
 
 
@@ -414,6 +421,8 @@ app.put('/api/admin/users/:id', authorize(['ADMIN', 'SUPER_ADMIN']), upload.sing
         console.error(`Error updating user ${userId}:`, error);
         res.status(500).json({ message: 'Gagal memperbarui data pengguna.' });
     }
+}, {
+    timeout: 30000,
 });
 
 
@@ -427,6 +436,8 @@ app.put('/api/admin/users/:id/approve', authorize(['ADMIN', 'SUPER_ADMIN']), asy
     } catch (error) {
         res.status(500).json({ message: 'Gagal menyetujui registrasi.' });
     }
+}, {
+    timeout: 30000,
 });
 
 app.put('/api/admin/users/:id/reject', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
@@ -439,6 +450,8 @@ app.put('/api/admin/users/:id/reject', authorize(['ADMIN', 'SUPER_ADMIN']), asyn
     } catch (error) {
         res.status(500).json({ message: 'Gagal menolak registrasi.' });
     }
+}, {
+    timeout: 30000,
 });
 
 app.post('/api/admin/projects', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
@@ -471,6 +484,8 @@ app.post('/api/admin/projects', authorize(['ADMIN', 'SUPER_ADMIN']), async (req,
         console.error('Error saat membuat proyek:', error);
         res.status(500).json({ message: 'Gagal membuat proyek baru.' });
     }
+}, {
+    timeout: 30000,
 });
 
 app.put('/api/admin/projects/:id', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
@@ -508,12 +523,16 @@ app.put('/api/admin/projects/:id', authorize(['ADMIN', 'SUPER_ADMIN']), async (r
                 where: { id: projectId },
                 include: { fields: true },
             });
+        }, {
+            timeout: 30000,
         });
         res.json(updatedProject);
     } catch (error) {
         console.error(`Error updating project ${projectId}:`, error);
         res.status(500).json({ message: 'Gagal memperbarui proyek.' });
     }
+}, {
+    timeout: 30000,
 });
 
 app.delete('/api/admin/projects/:id', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
@@ -570,7 +589,7 @@ app.get('/api/admin/submissions', authorize(['ADMIN', 'SUPER_ADMIN']), async (re
 });
 
 app.get('/api/users/me/submissions', authorize(), async (req, res) => {
-    const userId = req.user.id; 
+    const userId = req.user.id;
     const page = parseInt(req.query.page) || 1;
     const pageSize = parseInt(req.query.perPage) || 10;
     const skip = (page - 1) * pageSize;
@@ -758,7 +777,7 @@ app.put('/api/admin/submissions/:id/approve', authorize(['ADMIN', 'SUPER_ADMIN']
                 data: { status: 'APPROVED' },
             });
         }, {
-            timeout: 30000, // Menetapkan timeout menjadi 30 detik (30000 ms)
+            timeout: 30000,
         });
 
         res.json({ message: `Submission ID ${submissionId} berhasil disetujui.`, submission: updatedSubmission });
@@ -766,6 +785,8 @@ app.put('/api/admin/submissions/:id/approve', authorize(['ADMIN', 'SUPER_ADMIN']
         console.error(`Gagal menyetujui submission ${submissionId}:`, error);
         res.status(500).json({ message: error.message || 'Gagal memproses persetujuan.' });
     }
+}, {
+    timeout: 30000,
 });
 
 
@@ -780,6 +801,8 @@ app.put('/api/admin/submissions/:id/reject', authorize(['ADMIN', 'SUPER_ADMIN'])
     } catch (error) {
         res.status(500).json({ message: 'Gagal menolak submission.' });
     }
+}, {
+    timeout: 30000,
 });
 
 app.get('/api/superadmin/withdrawals', authorize(['SUPER_ADMIN']), async (req, res) => {
@@ -798,6 +821,8 @@ app.get('/api/superadmin/withdrawals', authorize(['SUPER_ADMIN']), async (req, r
     } catch (error) {
         res.status(500).json({ message: 'Gagal mengambil data penarikan.' });
     }
+}, {
+    timeout: 30000,
 });
 
 app.put('/api/superadmin/withdrawals/:id/approve', authorize(['SUPER_ADMIN']), async (req, res) => {
@@ -829,6 +854,8 @@ app.put('/api/superadmin/withdrawals/:id/approve', authorize(['SUPER_ADMIN']), a
     } catch (error) {
         res.status(500).json({ message: error.message || 'Gagal menyetujui penarikan.' });
     }
+}, {
+    timeout: 30000, 
 });
 /*
 const PORT = process.env.PORT || 6969;
