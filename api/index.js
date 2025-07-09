@@ -83,11 +83,9 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 app.get('/api/auth/check-token', authorize(), async (req, res) => {
-    // Middleware 'authorize' sudah memverifikasi token dan menaruh data user di req.user
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
 
-    // Pengecualian field yang tidak ingin ditampilkan dari data pengguna
     const { 
         password, 
         tglLahir, 
@@ -95,10 +93,8 @@ app.get('/api/auth/check-token', authorize(), async (req, res) => {
         previlegeStatus, 
         ...userData 
     } = req.user;
-    
-    // Kembalikan format yang sama seperti saat login
     res.status(200).json({
-        accessToken: token, // Kembalikan token yang sama yang dikirim
+        accessToken: token, 
         user: userData
     });
 });
