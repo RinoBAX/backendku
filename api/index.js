@@ -417,7 +417,7 @@ app.put('/api/admin/users/:id', authorize(['ADMIN', 'SUPER_ADMIN']), upload.sing
 });
 
 
-app.put('/api/admin/users/:id/approve', authorize(['ADMIN']), async (req, res) => {
+app.put('/api/admin/users/:id/approve', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
     try {
         const updatedUser = await prisma.user.update({
             where: { id: parseInt(req.params.id) },
@@ -429,7 +429,7 @@ app.put('/api/admin/users/:id/approve', authorize(['ADMIN']), async (req, res) =
     }
 });
 
-app.put('/api/admin/users/:id/reject', authorize(['ADMIN']), async (req, res) => {
+app.put('/api/admin/users/:id/reject', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
     try {
         const updatedUser = await prisma.user.update({
             where: { id: parseInt(req.params.id) },
@@ -441,7 +441,7 @@ app.put('/api/admin/users/:id/reject', authorize(['ADMIN']), async (req, res) =>
     }
 });
 
-app.post('/api/admin/projects', authorize(['ADMIN']), async (req, res) => {
+app.post('/api/admin/projects', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
     const { namaProyek, iconUrl, projectUrl, nilaiProyek, deskripsi, fields } = req.body;
     const creatorId = req.user.id;
 
@@ -473,7 +473,7 @@ app.post('/api/admin/projects', authorize(['ADMIN']), async (req, res) => {
     }
 });
 
-app.put('/api/admin/projects/:id', authorize(['ADMIN']), async (req, res) => {
+app.put('/api/admin/projects/:id', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
     const projectId = parseInt(req.params.id);
     const { namaProyek, iconUrl, nilaiProyek, projectUrl, deskripsi, fields } = req.body;
 
@@ -516,7 +516,7 @@ app.put('/api/admin/projects/:id', authorize(['ADMIN']), async (req, res) => {
     }
 });
 
-app.delete('/api/admin/projects/:id', authorize(['ADMIN']), async (req, res) => {
+app.delete('/api/admin/projects/:id', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
     try {
         await prisma.project.delete({
             where: { id: parseInt(req.params.id) }
@@ -529,7 +529,7 @@ app.delete('/api/admin/projects/:id', authorize(['ADMIN']), async (req, res) => 
 });
 
 
-app.get('/api/admin/submissions', authorize(['ADMIN']), async (req, res) => {
+app.get('/api/admin/submissions', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
     const { status } = req.query;
     const page = parseInt(req.query.page) || 1;
     const pageSize = parseInt(req.query.pageSize) || 10;
@@ -625,7 +625,7 @@ app.get('/api/users/me/submissions', authorize(), async (req, res) => {
     }
 });
 
-app.get('/api/admin/submissions/:id', authorize(['ADMIN']), async (req, res) => {
+app.get('/api/admin/submissions/:id', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
     const submissionId = parseInt(req.params.id);
     try {
         const submission = await prisma.submission.findUnique({
@@ -653,7 +653,7 @@ app.get('/api/admin/submissions/:id', authorize(['ADMIN']), async (req, res) => 
 });
 
 
-app.put('/api/admin/submissions/:id/approve', authorize(['ADMIN']), async (req, res) => {
+app.put('/api/admin/submissions/:id/approve', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
     const submissionId = parseInt(req.params.id);
     try {
         const updatedSubmission = await prisma.$transaction(async (tx) => {
@@ -766,7 +766,7 @@ app.put('/api/admin/submissions/:id/approve', authorize(['ADMIN']), async (req, 
 });
 
 
-app.put('/api/admin/submissions/:id/reject', authorize(['ADMIN']), async (req, res) => {
+app.put('/api/admin/submissions/:id/reject', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
     const { catatanAdmin } = req.body;
     try {
         const submission = await prisma.submission.update({
