@@ -5,8 +5,8 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { PrismaClient, Prisma } = require('@prisma/client');
 const { Decimal } = require('@prisma/client/runtime/library');
-const authorize = require('./middleware/auth'); 
-const { upload } = require('./config/cloudinary'); 
+const authorize = require('./middleware/auth');
+const { upload } = require('./config/s3');
 
 const prisma = new PrismaClient();
 const app = express();
@@ -14,53 +14,53 @@ app.use(cors());
 app.use(express.json());
 
 app.post('/api/auth/register', async (req, res) => {
-  const { nama, email, password, tglLahir, nomorTelepon, kecamatan, domisili, fotoKtp, bankName, noRekening, kodeReferralUpline } = req.body;
-  try {
-    if (!nama || !email || !password) {
-      return res.status(400).json({ message: 'Nama, email, dan password wajib diisi.' });
+    const { nama, email, password, tglLahir, nomorTelepon, kecamatan, domisili, fotoKtp, bankName, noRekening, kodeReferralUpline } = req.body;
+    try {
+        if (!nama || !email || !password) {
+            return res.status(400).json({ message: 'Nama, email, dan password wajib diisi.' });
+        }
+        const existingUser = await prisma.user.findUnique({ where: { email } });
+        if (existingUser) {
+            return res.status(400).json({ message: 'Email sudah terdaftar.' });
+        }
+        let uplineId = null;
+        if (kodeReferralUpline) {
+            const upline = await prisma.user.findUnique({ where: { kodeReferral: kodeReferralUpline } });
+            if (!upline) return res.status(404).json({ message: 'Kode referral tidak valid.' });
+            uplineId = upline.id;
+        }
+        const cleanName = nama.replace(/[^a-zA-Z]/g, '').toUpperCase();
+        if (cleanName.length < 3) return res.status(400).json({ message: 'Nama harus memiliki setidaknya 3 karakter huruf.' });
+
+        let newReferralCode = '';
+        let isCodeUnique = false;
+        const firstThree = cleanName.slice(0, 3);
+        const lastThree = cleanName.slice(-3);
+        while (!isCodeUnique) {
+            const randomNumber = Math.floor(Math.random() * 999) + 1;
+            const randomLetters = Array.from({ length: 3 }, () => 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[Math.floor(Math.random() * 26)]).join('');
+            const candidateCode = `${lastThree}${randomNumber}${firstThree}${randomLetters}`;
+            const codeExists = await prisma.user.findUnique({ where: { kodeReferral: candidateCode } });
+            if (!codeExists) {
+                newReferralCode = candidateCode;
+                isCodeUnique = true;
+            }
+        }
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const newUser = await prisma.user.create({
+            data: {
+                nama, email, password: hashedPassword, tglLahir: tglLahir ? new Date(tglLahir) : null,
+                nomorTelepon, kecamatan, domisili, fotoKtp, uplineId, kodeReferral: newReferralCode,
+                bankName: bankName || 'EMPTY',
+                noRekening,
+            },
+            select: { id: true, nama: true, email: true, kodeReferral: true }
+        });
+        res.status(201).json(newUser);
+    } catch (error) {
+        console.error('Error saat registrasi:', error);
+        res.status(500).json({ message: 'Terjadi kesalahan pada server.' });
     }
-    const existingUser = await prisma.user.findUnique({ where: { email } });
-    if (existingUser) {
-      return res.status(400).json({ message: 'Email sudah terdaftar.' });
-    }
-    let uplineId = null;
-    if (kodeReferralUpline) {
-      const upline = await prisma.user.findUnique({ where: { kodeReferral: kodeReferralUpline } });
-      if (!upline) return res.status(404).json({ message: 'Kode referral tidak valid.' });
-      uplineId = upline.id;
-    }
-    const cleanName = nama.replace(/[^a-zA-Z]/g, '').toUpperCase();
-    if (cleanName.length < 3) return res.status(400).json({ message: 'Nama harus memiliki setidaknya 3 karakter huruf.' });
-    
-    let newReferralCode = '';
-    let isCodeUnique = false;
-    const firstThree = cleanName.slice(0, 3);
-    const lastThree = cleanName.slice(-3);
-    while (!isCodeUnique) {
-      const randomNumber = Math.floor(Math.random() * 999) + 1;
-      const randomLetters = Array.from({ length: 3 }, () => 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[Math.floor(Math.random() * 26)]).join('');
-      const candidateCode = `${lastThree}${randomNumber}${firstThree}${randomLetters}`;
-      const codeExists = await prisma.user.findUnique({ where: { kodeReferral: candidateCode } });
-      if (!codeExists) {
-        newReferralCode = candidateCode;
-        isCodeUnique = true;
-      }
-    }
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const newUser = await prisma.user.create({
-      data: {
-        nama, email, password: hashedPassword, tglLahir: tglLahir ? new Date(tglLahir) : null,
-        nomorTelepon, kecamatan, domisili, fotoKtp, uplineId, kodeReferral: newReferralCode,
-        bankName: bankName || 'EMPTY',
-        noRekening,
-      },
-      select: { id: true, nama: true, email: true, kodeReferral: true }
-    });
-    res.status(201).json(newUser);
-  } catch (error) {
-    console.error('Error saat registrasi:', error);
-    res.status(500).json({ message: 'Terjadi kesalahan pada server.' });
-  }
 });
 
 app.post('/api/auth/login', async (req, res) => {
@@ -94,16 +94,16 @@ app.get('/api/users/me', authorize(), async (req, res) => {
                 bankName: true, noRekening: true,
                 upline: { select: { id: true, nama: true, email: true } },
                 transactions: { orderBy: { transactionDate: 'desc' }, take: 20 },
-                downlines: { 
+                downlines: {
                     skip: (downlinePage - 1) * pageSize,
                     take: pageSize,
-                    select: { id: true, nama: true, email: true } 
+                    select: { id: true, nama: true, email: true }
                 },
-                submissions: { 
+                submissions: {
                     skip: (submissionPage - 1) * pageSize,
                     take: pageSize,
-                    orderBy: { tglDibuat: 'desc' }, 
-                    include: { project: { select: { namaProyek: true }} } 
+                    orderBy: { tglDibuat: 'desc' },
+                    include: { project: { select: { namaProyek: true } } }
                 },
                 _count: {
                     select: {
@@ -114,7 +114,7 @@ app.get('/api/users/me', authorize(), async (req, res) => {
             }
         });
         if (!user) return res.status(404).json({ message: 'User tidak ditemukan.' });
-        
+
         const response = {
             profile: {
                 ...user,
@@ -132,17 +132,21 @@ app.get('/api/users/me', authorize(), async (req, res) => {
 });
 
 app.put('/api/users/me/picture', authorize(), upload.single('picture'), async (req, res) => {
-    if (!req.file) return res.status(400).json({ message: 'Tidak ada file gambar yang diunggah.' });
+    if (!req.file) {
+        return res.status(400).json({ message: 'Tidak ada file gambar yang diunggah.' });
+    }
     try {
         const updatedUser = await prisma.user.update({
             where: { id: req.user.id },
-            data: { picture: req.file.path }
+            data: { picture: req.file.location } 
         });
         res.json({ message: 'Foto profil berhasil diperbarui.', pictureUrl: updatedUser.picture });
     } catch (error) {
+        console.error('Gagal memperbarui foto profil:', error);
         res.status(500).json({ message: 'Gagal memperbarui foto profil.' });
     }
 });
+
 
 app.get('/api/projects', authorize(), async (req, res) => {
     const page = parseInt(req.query.page) || 1;
@@ -152,10 +156,10 @@ app.get('/api/projects', authorize(), async (req, res) => {
     try {
         const [projects, totalItems] = await prisma.$transaction([
             prisma.project.findMany({
-                include: { 
+                include: {
                     fields: true,
-                    creator: { select: { nama: true }},
-                    submissions: { select: { status: true }} 
+                    creator: { select: { nama: true } },
+                    submissions: { select: { status: true } }
                 },
                 skip: skip,
                 take: pageSize,
@@ -163,7 +167,7 @@ app.get('/api/projects', authorize(), async (req, res) => {
             }),
             prisma.project.count()
         ]);
-        
+
         res.json({
             data: projects,
             pagination: {
@@ -211,7 +215,7 @@ app.post('/api/projects/:projectId/submit', authorize(), upload.any(), async (re
                 req.files.forEach(file => {
                     if (fieldMap.has(file.fieldname)) {
                         submissionValues.push({
-                            value: file.path,
+                            value: file.location, 
                             submissionId: newSubmission.id,
                             projectFieldId: parseInt(file.fieldname),
                         });
@@ -232,8 +236,9 @@ app.post('/api/projects/:projectId/submit', authorize(), upload.any(), async (re
     }
 });
 
+
 app.get('/api/admin/users', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
-    const { status } = req.query; 
+    const { status } = req.query;
     const page = parseInt(req.query.page) || 1;
     const pageSize = parseInt(req.query.pageSize) || 10;
     const skip = (page - 1) * pageSize;
@@ -254,7 +259,7 @@ app.get('/api/admin/users', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res
             }),
             prisma.user.count({ where: whereClause })
         ]);
-        
+
         res.json({
             data: users,
             pagination: {
@@ -282,12 +287,13 @@ app.put('/api/admin/users/:id', authorize(['ADMIN', 'SUPER_ADMIN']), upload.sing
             bankName,
             noRekening,
         };
+        
         if (req.user.role === 'SUPER_ADMIN' && balance !== undefined) {
             dataToUpdate.balance = new Decimal(balance);
         }
 
         if (req.file) {
-            dataToUpdate.picture = req.file.path;
+            dataToUpdate.picture = req.file.location;
         }
 
         const updatedUser = await prisma.user.update({
@@ -301,6 +307,7 @@ app.put('/api/admin/users/:id', authorize(['ADMIN', 'SUPER_ADMIN']), upload.sing
         res.status(500).json({ message: 'Gagal memperbarui data pengguna.' });
     }
 });
+
 
 app.put('/api/admin/users/:id/approve', authorize(['ADMIN']), async (req, res) => {
     try {
@@ -425,9 +432,9 @@ app.get('/api/admin/submissions', authorize(['ADMIN']), async (req, res) => {
         if (status && ['PENDING', 'APPROVED', 'REJECTED'].includes(status)) {
             whereClause.status = status;
         }
-        
+
         const [submissions, totalItems] = await prisma.$transaction([
-             prisma.submission.findMany({
+            prisma.submission.findMany({
                 where: whereClause,
                 include: {
                     user: { select: { nama: true } },
@@ -490,14 +497,14 @@ app.put('/api/admin/submissions/:id/approve', authorize(['ADMIN']), async (req, 
                 where: { id: submissionId },
                 include: {
                     project: true,
-                    user: { 
-                        include: { 
-                            upline: { 
-                                include: { 
-                                    upline: true 
-                                } 
-                            } 
-                        } 
+                    user: {
+                        include: {
+                            upline: {
+                                include: {
+                                    upline: true
+                                }
+                            }
+                        }
                     }
                 }
             });
@@ -513,12 +520,12 @@ app.put('/api/admin/submissions/:id/approve', authorize(['ADMIN']), async (req, 
                 data: { balance: { increment: nilaiProyek } },
             });
             await tx.transaction.create({
-                data: { 
-                    tipe: 'PENGERJAAN_PROYEK', 
-                    jumlah: nilaiProyek, 
-                    deskripsi: `Bonus pengerjaan proyek: ${project.namaProyek}`, 
-                    userId: pengerja.id, 
-                    submissionId: submission.id 
+                data: {
+                    tipe: 'PENGERJAAN_PROYEK',
+                    jumlah: nilaiProyek,
+                    deskripsi: `Bonus pengerjaan proyek: ${project.namaProyek}`,
+                    userId: pengerja.id,
+                    submissionId: submission.id
                 }
             });
 
@@ -526,28 +533,28 @@ app.put('/api/admin/submissions/:id/approve', authorize(['ADMIN']), async (req, 
             if (uplineL1) {
                 const komisiL1 = nilaiProyek.mul(0.10);
                 await tx.user.update({ where: { id: uplineL1.id }, data: { balance: { increment: komisiL1 } } });
-                await tx.transaction.create({ 
-                    data: { 
-                        tipe: 'KOMISI_UPLINE_1', 
-                        jumlah: komisiL1, 
-                        deskripsi: `Komisi dari downline: ${pengerja.nama}`, 
-                        userId: uplineL1.id, 
-                        submissionId: submission.id 
-                    } 
+                await tx.transaction.create({
+                    data: {
+                        tipe: 'KOMISI_UPLINE_1',
+                        jumlah: komisiL1,
+                        deskripsi: `Komisi dari downline: ${pengerja.nama}`,
+                        userId: uplineL1.id,
+                        submissionId: submission.id
+                    }
                 });
 
                 const uplineL2 = uplineL1.upline;
                 if (uplineL2) {
                     const komisiL2 = nilaiProyek.mul(0.01);
                     await tx.user.update({ where: { id: uplineL2.id }, data: { balance: { increment: komisiL2 } } });
-                    await tx.transaction.create({ 
-                        data: { 
-                            tipe: 'KOMISI_UPLINE_2', 
-                            jumlah: komisiL2, 
-                            deskripsi: `Komisi dari downline level 2: ${pengerja.nama}`, 
-                            userId: uplineL2.id, 
-                            submissionId: submission.id 
-                        } 
+                    await tx.transaction.create({
+                        data: {
+                            tipe: 'KOMISI_UPLINE_2',
+                            jumlah: komisiL2,
+                            deskripsi: `Komisi dari downline level 2: ${pengerja.nama}`,
+                            userId: uplineL2.id,
+                            submissionId: submission.id
+                        }
                     });
                 }
             }
@@ -571,7 +578,7 @@ app.put('/api/admin/submissions/:id/approve', authorize(['ADMIN']), async (req, 
                     });
                     await tx.transaction.create({
                         data: {
-                            tipe: 'BONUS_OPERASIONAL', 
+                            tipe: 'BONUS_OPERASIONAL',
                             jumlah: bonusAmount,
                             deskripsi: `Bonus operasional dari persetujuan submission ID: ${submission.id}`,
                             userId: operationalUser.id,
@@ -586,7 +593,7 @@ app.put('/api/admin/submissions/:id/approve', authorize(['ADMIN']), async (req, 
                 data: { status: 'APPROVED' },
             });
         });
-        
+
         res.json({ message: `Submission ID ${submissionId} berhasil disetujui.`, submission: updatedSubmission });
     } catch (error) {
         console.error(`Gagal menyetujui submission ${submissionId}:`, error);
@@ -635,7 +642,7 @@ app.put('/api/superadmin/withdrawals/:id/approve', authorize(['SUPER_ADMIN']), a
             if (!withdrawal) throw new Error('Permintaan penarikan tidak ditemukan.');
             if (withdrawal.status !== 'PENDING') throw new Error('Permintaan ini sudah diproses.');
 
-            const user = await tx.user.findUnique({ where: {id: withdrawal.userId }});
+            const user = await tx.user.findUnique({ where: { id: withdrawal.userId } });
             if (new Decimal(user.balance).lessThan(withdrawal.totalWithdrawal)) {
                 throw new Error('Saldo pengguna tidak mencukupi untuk penarikan ini.');
             }
@@ -656,10 +663,10 @@ app.put('/api/superadmin/withdrawals/:id/approve', authorize(['SUPER_ADMIN']), a
         res.status(500).json({ message: error.message || 'Gagal menyetujui penarikan.' });
     }
 });
-
+/*
 const PORT = process.env.PORT || 6969;
 app.listen(PORT, () => {
-  console.log(`Server berjalan di http://localhost:${PORT}`);
+    console.log(`Server berjalan di http://localhost:${PORT}`);
 });
-
+*/
 module.exports = app;
