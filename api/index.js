@@ -101,56 +101,54 @@ app.get('/api/auth/check-token', authorize(), async (req, res) => {
 });
 
 
-// app.get('/api/users/downline/:id', authorize(), async (req, res) => {
-//     const targetUserId = parseInt(req.params.id);
-//     const page = parseInt(req.query.page) || 1;
-//     const pageSize = parseInt(req.query.perPage) || 10;
-//     const skip = (page - 1) * pageSize;
+app.get('/api/users/downline/:id', authorize(), async (req, res) => {
+    const targetUserId = parseInt(req.params.id);
+    const page = parseInt(req.query.page) || 1;
+    const pageSize = parseInt(req.query.perPage) || 10;
+    const skip = (page - 1) * pageSize;
 
-//     try {
-//         const [downlines, totalItems] = await prisma.$transaction([
-//             prisma.user.findMany({
-//                 where: {
-//                     uplineId: targetUserId,
-//                 },
-//                 select: {
-//                     id: true,
-//                     nama: true,
-//                     email: true,
-//                 },
-//                 orderBy: {
-//                     tglDibuat: 'desc',
-//                 },
-//                 skip: skip,
-//                 take: pageSize,
-//             }),
-//             prisma.user.count({
-//                 where: {
-//                     uplineId: targetUserId,
-//                 },
-//             }),
-//         ]);
+    try {
+        const [downlines, totalItems] = await prisma.$transaction([
+            prisma.user.findMany({
+                where: {
+                    uplineId: targetUserId,
+                },
+                select: {
+                    id: true,
+                    nama: true,
+                    email: true,
+                },
+                orderBy: {
+                    tglDibuat: 'desc',
+                },
+                skip: skip,
+                take: pageSize,
+            }),
+            prisma.user.count({
+                where: {
+                    uplineId: targetUserId,
+                },
+            }),
+        ]);
 
-//         const totalPages = Math.ceil(totalItems / pageSize);
+        const totalPages = Math.ceil(totalItems / pageSize);
 
-//         res.status(200).json({
-//             success: true,
-//             message: 'Downline found',
-//             result: {
-//                 totalItems,
-//                 totalPages,
-//                 perPage: pageSize,
-//                 currentPage: page,
-//                 data: downlines,
-//             },
-//         });
-//     } catch (error) {
-//         console.error(`Error fetching downlines for user ${targetUserId}:`, error);
-//         res.status(500).json({ success: false, message: 'Failed to fetch downline data.' });
-//     }
-// }, {
-//     timeout: 30000,
-// });
+        res.status(200).json({
+            success: true,
+            message: 'Downline found',
+            result: {
+                totalItems,
+                totalPages,
+                perPage: pageSize,
+                currentPage: page,
+                data: downlines,
+            },
+        });
+    } catch (error) {
+        console.error(`Error fetching downlines for user ${targetUserId}:`, error);
+        res.status(500).json({ success: false, message: 'Failed to fetch downline data.' });
+    }
+});
 
 app.get('/api/users/me', authorize(), async (req, res) => {
     const submissionPage = parseInt(req.query.submissionPage) || 1;
@@ -345,8 +343,6 @@ app.post('/api/projects/:projectId/submit', authorize(), upload.any(), async (re
         console.error("Error saat submit pengerjaan:", error);
         res.status(500).json({ message: 'Gagal mengirim pengerjaan.' });
     }
-}, {
-    timeout: 30000,
 });
 
 
@@ -419,8 +415,6 @@ app.put('/api/admin/users/:id', authorize(['ADMIN', 'SUPER_ADMIN']), upload.sing
         console.error(`Error updating user ${userId}:`, error);
         res.status(500).json({ message: 'Gagal memperbarui data pengguna.' });
     }
-}, {
-    timeout: 30000,
 });
 
 
@@ -434,8 +428,6 @@ app.put('/api/admin/users/:id/approve', authorize(['ADMIN', 'SUPER_ADMIN']), asy
     } catch (error) {
         res.status(500).json({ message: 'Gagal menyetujui registrasi.' });
     }
-}, {
-    timeout: 30000,
 });
 
 app.put('/api/admin/users/:id/reject', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
@@ -448,8 +440,6 @@ app.put('/api/admin/users/:id/reject', authorize(['ADMIN', 'SUPER_ADMIN']), asyn
     } catch (error) {
         res.status(500).json({ message: 'Gagal menolak registrasi.' });
     }
-}, {
-    timeout: 30000,
 });
 
 app.post('/api/admin/projects', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
@@ -482,8 +472,6 @@ app.post('/api/admin/projects', authorize(['ADMIN', 'SUPER_ADMIN']), async (req,
         console.error('Error saat membuat proyek:', error);
         res.status(500).json({ message: 'Gagal membuat proyek baru.' });
     }
-}, {
-    timeout: 30000,
 });
 
 app.put('/api/admin/projects/:id', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
@@ -527,8 +515,6 @@ app.put('/api/admin/projects/:id', authorize(['ADMIN', 'SUPER_ADMIN']), async (r
         console.error(`Error updating project ${projectId}:`, error);
         res.status(500).json({ message: 'Gagal memperbarui proyek.' });
     }
-}, {
-    timeout: 30000,
 });
 
 app.delete('/api/admin/projects/:id', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
@@ -779,8 +765,6 @@ app.put('/api/admin/submissions/:id/approve', authorize(['ADMIN', 'SUPER_ADMIN']
         console.error(`Gagal menyetujui submission ${submissionId}:`, error);
         res.status(500).json({ message: error.message || 'Gagal memproses persetujuan.' });
     }
-}, {
-    timeout: 30000,
 });
 
 
@@ -795,8 +779,6 @@ app.put('/api/admin/submissions/:id/reject', authorize(['ADMIN', 'SUPER_ADMIN'])
     } catch (error) {
         res.status(500).json({ message: 'Gagal menolak submission.' });
     }
-}, {
-    timeout: 30000,
 });
 
 app.get('/api/superadmin/withdrawals', authorize(['SUPER_ADMIN']), async (req, res) => {
@@ -815,8 +797,6 @@ app.get('/api/superadmin/withdrawals', authorize(['SUPER_ADMIN']), async (req, r
     } catch (error) {
         res.status(500).json({ message: 'Gagal mengambil data penarikan.' });
     }
-}, {
-    timeout: 30000,
 });
 
 app.put('/api/superadmin/withdrawals/:id/approve', authorize(['SUPER_ADMIN']), async (req, res) => {
@@ -848,8 +828,6 @@ app.put('/api/superadmin/withdrawals/:id/approve', authorize(['SUPER_ADMIN']), a
     } catch (error) {
         res.status(500).json({ message: error.message || 'Gagal menyetujui penarikan.' });
     }
-}, {
-    timeout: 30000,
 });
 /*
 const PORT = process.env.PORT || 6969;
