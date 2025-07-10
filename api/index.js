@@ -256,8 +256,6 @@ app.put('/api/users/me/picture', authorize(), upload.single('picture'), async (r
         console.error('Gagal memperbarui foto profil:', error);
         res.status(500).json({ message: 'Gagal memperbarui foto profil.' });
     }
-}, {
-    timeout: 30000,
 });
 
 
