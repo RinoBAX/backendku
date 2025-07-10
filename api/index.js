@@ -268,7 +268,7 @@ app.get('/api/projects', authorize(), async (req, res) => {
                 include: {
                     fields: true,
                     creator: { select: { nama: true } },
-                    submissions: { select: { status: true } }
+                    // submissions: { select: { status: true } }
                 },
                 skip: skip,
                 take: pageSize,

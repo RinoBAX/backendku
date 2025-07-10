@@ -131,6 +131,13 @@ model Transaction {
   @@map("transactions")
 }
 
+model News {
+  id          Int    @id @default(autoincrement())
+  imageNews   String
+  description String?
+  newsUrl     String?
+}
+
 model Withdrawal {
   id              Int              @id @default(autoincrement())
   totalWithdrawal Decimal          @db.Decimal(12, 2)
