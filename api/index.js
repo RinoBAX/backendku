@@ -101,56 +101,56 @@ app.get('/api/auth/check-token', authorize(), async (req, res) => {
 });
 
 
-app.get('/api/users/downline/:id', authorize(), async (req, res) => {
-    const targetUserId = parseInt(req.params.id);
-    const page = parseInt(req.query.page) || 1;
-    const pageSize = parseInt(req.query.perPage) || 10;
-    const skip = (page - 1) * pageSize;
+// app.get('/api/users/downline/:id', authorize(), async (req, res) => {
+//     const targetUserId = parseInt(req.params.id);
+//     const page = parseInt(req.query.page) || 1;
+//     const pageSize = parseInt(req.query.perPage) || 10;
+//     const skip = (page - 1) * pageSize;
 
-    try {
-        const [downlines, totalItems] = await prisma.$transaction([
-            prisma.user.findMany({
-                where: {
-                    uplineId: targetUserId,
-                },
-                select: {
-                    id: true,
-                    nama: true,
-                    email: true,
-                },
-                orderBy: {
-                    tglDibuat: 'desc',
-                },
-                skip: skip,
-                take: pageSize,
-            }),
-            prisma.user.count({
-                where: {
-                    uplineId: targetUserId,
-                },
-            }),
-        ]);
+//     try {
+//         const [downlines, totalItems] = await prisma.$transaction([
+//             prisma.user.findMany({
+//                 where: {
+//                     uplineId: targetUserId,
+//                 },
+//                 select: {
+//                     id: true,
+//                     nama: true,
+//                     email: true,
+//                 },
+//                 orderBy: {
+//                     tglDibuat: 'desc',
+//                 },
+//                 skip: skip,
+//                 take: pageSize,
+//             }),
+//             prisma.user.count({
+//                 where: {
+//                     uplineId: targetUserId,
+//                 },
+//             }),
+//         ]);
 
-        const totalPages = Math.ceil(totalItems / pageSize);
+//         const totalPages = Math.ceil(totalItems / pageSize);
 
-        res.status(200).json({
-            success: true,
-            message: 'Downline found',
-            result: {
-                totalItems,
-                totalPages,
-                perPage: pageSize,
-                currentPage: page,
-                data: downlines,
-            },
-        });
-    } catch (error) {
-        console.error(`Error fetching downlines for user ${targetUserId}:`, error);
-        res.status(500).json({ success: false, message: 'Failed to fetch downline data.' });
-    }
-}, {
-    timeout: 30000,
-});
+//         res.status(200).json({
+//             success: true,
+//             message: 'Downline found',
+//             result: {
+//                 totalItems,
+//                 totalPages,
+//                 perPage: pageSize,
+//                 currentPage: page,
+//                 data: downlines,
+//             },
+//         });
+//     } catch (error) {
+//         console.error(`Error fetching downlines for user ${targetUserId}:`, error);
+//         res.status(500).json({ success: false, message: 'Failed to fetch downline data.' });
+//     }
+// }, {
+//     timeout: 30000,
+// });
 
 app.get('/api/users/me', authorize(), async (req, res) => {
     const submissionPage = parseInt(req.query.submissionPage) || 1;
