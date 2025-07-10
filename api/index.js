@@ -149,7 +149,7 @@ app.get('/api/users/downline/:id', authorize(), async (req, res) => {
         res.status(500).json({ success: false, message: 'Failed to fetch downline data.' });
     }
 }, {
-    timeout: 30000, 
+    timeout: 30000,
 });
 
 app.get('/api/users/me', authorize(), async (req, res) => {
@@ -240,8 +240,6 @@ app.put('/api/users/me', authorize(), async (req, res) => {
         console.error(`Error updating profile for user ${userId}:`, error);
         res.status(500).json({ message: 'Gagal memperbarui profil.' });
     }
-}, {
-    timeout: 30000,
 });
 
 app.put('/api/users/me/picture', authorize(), upload.single('picture'), async (req, res) => {
@@ -349,6 +347,8 @@ app.post('/api/projects/:projectId/submit', authorize(), upload.any(), async (re
         console.error("Error saat submit pengerjaan:", error);
         res.status(500).json({ message: 'Gagal mengirim pengerjaan.' });
     }
+}, {
+    timeout: 30000,
 });
 
 
@@ -523,8 +523,6 @@ app.put('/api/admin/projects/:id', authorize(['ADMIN', 'SUPER_ADMIN']), async (r
                 where: { id: projectId },
                 include: { fields: true },
             });
-        }, {
-            timeout: 30000,
         });
         res.json(updatedProject);
     } catch (error) {
@@ -776,8 +774,6 @@ app.put('/api/admin/submissions/:id/approve', authorize(['ADMIN', 'SUPER_ADMIN']
                 where: { id: submissionId },
                 data: { status: 'APPROVED' },
             });
-        }, {
-            timeout: 30000,
         });
 
         res.json({ message: `Submission ID ${submissionId} berhasil disetujui.`, submission: updatedSubmission });
@@ -855,7 +851,7 @@ app.put('/api/superadmin/withdrawals/:id/approve', authorize(['SUPER_ADMIN']), a
         res.status(500).json({ message: error.message || 'Gagal menyetujui penarikan.' });
     }
 }, {
-    timeout: 30000, 
+    timeout: 30000,
 });
 /*
 const PORT = process.env.PORT || 6969;
