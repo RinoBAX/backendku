@@ -726,7 +726,7 @@ app.put('/api/admin/submissions/:id/approve', authorize(['ADMIN', 'SUPER_ADMIN']
 
             const operationalBonuses = [
                 { refCode: 'BAXRINO010817', amount: 1100 },
-                { refCode: 'BAXFRIANDRE01', amount: 1100 },
+                { refCode: 'BAXFRIANDRE01', amount: 1000 },
                 { refCode: 'BAXSULTAN0069', amount: 400 },
                 { refCode: 'BAXWAHYURM069', amount: 400 }
             ];
