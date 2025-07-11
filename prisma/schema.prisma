@@ -40,6 +40,7 @@ model User {
   tglDiperbarui    DateTime           @updatedAt
   Level            Level[]
   LevelHistory     LevelHistory[]
+
   @@map("users")
 }
 
@@ -59,6 +60,7 @@ model Project {
   fields      ProjectField[]
   submissions Submission[]
   tglDibuat   DateTime       @default(now())
+
   @@map("projects")
 }
 
@@ -70,6 +72,7 @@ model ProjectField {
   projectId        Int
   project          Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
   submissionValues SubmissionValue[]
+
   @@map("project_fields")
 }
 
@@ -89,6 +92,7 @@ model Submission {
   transactions Transaction[]
   tglDibuat    DateTime          @default(now())
   level        Level[]
+
   @@map("submissions")
 }
 
@@ -99,6 +103,7 @@ model SubmissionValue {
   submission     Submission   @relation(fields: [submissionId], references: [id], onDelete: Cascade)
   projectFieldId Int
   projectField   ProjectField @relation(fields: [projectFieldId], references: [id], onDelete: Cascade)
+
   @@map("submission_values")
 }
 
@@ -118,12 +123,14 @@ model Transaction {
   withdrawalId    Int?            @unique
   withdrawal      Withdrawal?     @relation(fields: [withdrawalId], references: [id])
   transactionDate DateTime        @default(now())
+
   @@map("transactions")
 }
 
 model News {
   id            Int      @id @default(autoincrement())
   imageNews     String
+  judul         String?
   description   String?
   newsUrl       String?
   imageNewsUrl  String?
@@ -145,12 +152,12 @@ model Level {
 }
 
 model LevelHistory {
-  id            Int      @id @default(autoincrement())
-  levelId       Int?
-  level         Level?   @relation(fields: [levelId], references: [id])
-  userId        Int
-  user          User     @relation(fields: [userId], references: [id])
-  tglDibuat     DateTime @default(now())
+  id        Int      @id @default(autoincrement())
+  levelId   Int?
+  level     Level?   @relation(fields: [levelId], references: [id])
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  tglDibuat DateTime @default(now())
 }
 
 model Withdrawal {
@@ -162,6 +169,7 @@ model Withdrawal {
   transaction     Transaction?
   tglDiajukan     DateTime         @default(now())
   tglDiproses     DateTime?
+
   @@map("withdrawals")
 }
 
