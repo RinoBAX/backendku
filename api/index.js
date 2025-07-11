@@ -334,6 +334,7 @@ app.get('/api/projects', async (req, res) => {
     const skip = (page - 1) * pageSize;
 
     try {
+        
         const [projects, totalItems] = await prisma.$transaction([
             prisma.project.findMany({
                 include: {
@@ -654,7 +655,9 @@ app.get('/api/users/me/submissions', authorize(), async (req, res) => {
                 include: {
                     project: {
                         select: {
-                            namaProyek: true
+                            namaProyek: true,
+                            nilaiProyek: true,
+                            iconUrl: true
                         }
                     },
                     values: {
