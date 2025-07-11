@@ -114,7 +114,7 @@ app.get('/api/news', async (req, res) => {
     }
 });
 
-app.post('/api/news', authorize(['ADMIN', 'SUPER_ADMIN']), upload.single('imageNews'), async (req, res) => {
+app.post('/api/admin/news/submit', authorize(['ADMIN', 'SUPER_ADMIN']), upload.single('imageNews'), async (req, res) => {
     const { description, newsUrl, imageNewsUrl } = req.body;
 
     if (!req.file) {
@@ -137,7 +137,7 @@ app.post('/api/news', authorize(['ADMIN', 'SUPER_ADMIN']), upload.single('imageN
     }
 });
 
-app.put('/api/news/:id', authorize(['ADMIN', 'SUPER_ADMIN']), upload.single('imageNews'), async (req, res) => {
+app.put('/api/admin/news/update/:id', authorize(['ADMIN', 'SUPER_ADMIN']), upload.single('imageNews'), async (req, res) => {
     const newsId = parseInt(req.params.id);
     const { description, newsUrl, imageNewsUrl } = req.body;
 
