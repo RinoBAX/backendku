@@ -100,6 +100,71 @@ app.get('/api/auth/check-token', authorize(), async (req, res) => {
     });
 });
 
+app.get('/api/news', async (req, res) => {
+    try {
+        const news = await prisma.news.findMany({
+            orderBy: {
+                tglDibuat: 'desc'
+            }
+        });
+        res.status(200).json(news);
+    } catch (error) {
+        console.error("Error fetching news:", error);
+        res.status(500).json({ message: 'Gagal mengambil data berita.' });
+    }
+});
+
+app.post('/api/news', authorize(['ADMIN', 'SUPER_ADMIN']), upload.single('imageNews'), async (req, res) => {
+    const { description, newsUrl, imageNewsUrl } = req.body;
+
+    if (!req.file) {
+        return res.status(400).json({ message: 'Gambar berita wajib diunggah.' });
+    }
+
+    try {
+        const newNews = await prisma.news.create({
+            data: {
+                imageNews: req.file.location,
+                description,
+                newsUrl,
+                imageNewsUrl,
+            }
+        });
+        res.status(201).json(newNews);
+    } catch (error) {
+        console.error("Error creating news:", error);
+        res.status(500).json({ message: 'Gagal membuat berita baru.' });
+    }
+});
+
+app.put('/api/news/:id', authorize(['ADMIN', 'SUPER_ADMIN']), upload.single('imageNews'), async (req, res) => {
+    const newsId = parseInt(req.params.id);
+    const { description, newsUrl, imageNewsUrl } = req.body;
+
+    try {
+        const dataToUpdate = {
+            description,
+            newsUrl,
+            imageNewsUrl,
+        };
+
+        if (req.file) {
+            dataToUpdate.imageNews = req.file.location;
+        }
+
+        const updatedNews = await prisma.news.update({
+            where: { id: newsId },
+            data: dataToUpdate,
+        });
+
+        res.status(200).json(updatedNews);
+    } catch (error) {
+        console.error(`Error updating news ${newsId}:`, error);
+        res.status(500).json({ message: 'Gagal memperbarui berita.' });
+    }
+});
+
+
 
 app.get('/api/users/downline/:id', authorize(), async (req, res) => {
     const targetUserId = parseInt(req.params.id);

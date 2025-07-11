@@ -126,6 +126,7 @@ model News {
   imageNews     String
   description   String?
   newsUrl       String?
+  imageNewsUrl  String?
   tglDibuat     DateTime @default(now())
   tglDiperbarui DateTime @updatedAt
 }
