@@ -14,7 +14,7 @@ app.use(cors());
 app.use(express.json());
 
 app.post('/api/auth/logout', authorize(), async (req, res) => {
-    res.status(200).json({ message: 'Logout berhasil.' });
+    res.status(200).json({ message: 'Logout berhasil, sultan konyol wkwkwk.' });
 });
 
 
