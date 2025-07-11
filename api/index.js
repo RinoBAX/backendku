@@ -495,7 +495,7 @@ app.post('/api/admin/youtube', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, 
         res.status(500).json({ message: 'Gagal membuat entri Youtube Apps baru.' });
     }
 });
-app.put('/api/admin/youtube-apps/:id', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
+app.put('/api/admin/youtube/:id', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
     const { id } = req.params;
     const { urlYoutube } = req.body;
     const newCreatorId = req.user.id;
