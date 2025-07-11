@@ -13,6 +13,11 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+app.post('/api/auth/logout', authorize(), async (req, res) => {
+    res.status(200).json({ message: 'Logout berhasil.' });
+});
+
+
 app.post('/api/auth/register', async (req, res) => {
     const { nama, email, password, tglLahir, nomorTelepon, kecamatan, domisili, fotoKtp, bankName, noRekening, kodeReferralUpline } = req.body;
     try {
