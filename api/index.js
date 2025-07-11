@@ -457,7 +457,7 @@ app.get('/api/admin/history-youtube-apps', authorize(['ADMIN', 'SUPER_ADMIN']), 
     }
 });
 
-app.post('/api/admin/youtube-apps', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
+app.post('/api/admin/youtube', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
     const { urlYoutube } = req.body;
     const creatorId = req.user.id;
 
