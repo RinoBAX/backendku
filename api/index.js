@@ -327,7 +327,6 @@ app.put('/api/users/me/picture', authorize(), upload.single('picture'), async (r
     }
 });
 
-// GET semua data YoutubeApps (Publik, tanpa otentikasi)
 app.get('/api/youtube-apps', async (req, res) => {
     try {
         const youtubeApps = await prisma.youtubeApps.findMany({
@@ -349,7 +348,6 @@ app.get('/api/youtube-apps', async (req, res) => {
     }
 });
 
-// GET semua riwayat YoutubeApps (Hanya Admin & Super Admin) dengan paginasi
 app.get('/api/admin/history-youtube-apps', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const pageSize = parseInt(req.query.pageSize) || 20;
@@ -394,7 +392,6 @@ app.get('/api/admin/history-youtube-apps', authorize(['ADMIN', 'SUPER_ADMIN']), 
     }
 });
 
-// GET semua data YoutubeApps (Publik, tanpa otentikasi)
 app.get('/api/youtube-apps', async (req, res) => {
     try {
         const youtubeApps = await prisma.youtubeApps.findMany({
@@ -416,7 +413,6 @@ app.get('/api/youtube-apps', async (req, res) => {
     }
 });
 
-// GET semua riwayat YoutubeApps (Hanya Admin & Super Admin) dengan paginasi
 app.get('/api/admin/history-youtube-apps', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const pageSize = parseInt(req.query.pageSize) || 20;
@@ -461,8 +457,6 @@ app.get('/api/admin/history-youtube-apps', authorize(['ADMIN', 'SUPER_ADMIN']), 
     }
 });
 
-// POST untuk membuat entri YoutubeApps baru (Hanya Admin & Super Admin)
-// Logika: Memindahkan semua entri yang ada ke riwayat, lalu membuat entri baru.
 app.post('/api/admin/youtube-apps', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
     const { urlYoutube } = req.body;
     const creatorId = req.user.id;
@@ -473,25 +467,18 @@ app.post('/api/admin/youtube-apps', authorize(['ADMIN', 'SUPER_ADMIN']), async (
 
     try {
         const newEntry = await prisma.$transaction(async (tx) => {
-            // 1. Ambil semua entri YoutubeApps yang ada saat ini
             const existingEntries = await tx.youtubeApps.findMany();
-
-            // 2. Jika ada, pindahkan ke riwayat
             if (existingEntries.length > 0) {
                 const historyData = existingEntries.map(entry => ({
                     urlYoutube: entry.urlYoutube,
                     youtubeAppsId: entry.id,
-                    creatorId: entry.creatorId, // Gunakan creatorId dari entri lama
+                    creatorId: entry.creatorId, 
                 }));
                 await tx.historyYoutubeApps.createMany({
                     data: historyData,
                 });
             }
-            
-            // 3. Hapus semua entri lama dari YoutubeApps
             await tx.youtubeApps.deleteMany({});
-
-            // 4. Buat entri baru
             const createdEntry = await tx.youtubeApps.create({
                 data: {
                     urlYoutube,
@@ -508,9 +495,6 @@ app.post('/api/admin/youtube-apps', authorize(['ADMIN', 'SUPER_ADMIN']), async (
         res.status(500).json({ message: 'Gagal membuat entri Youtube Apps baru.' });
     }
 });
-
-// PUT untuk mengedit entri YoutubeApps yang ada (Hanya Admin & Super Admin)
-// Logika: Memindahkan entri yang akan diubah ke riwayat, lalu perbarui entri tersebut.
 app.put('/api/admin/youtube-apps/:id', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
     const { id } = req.params;
     const { urlYoutube } = req.body;
@@ -522,7 +506,6 @@ app.put('/api/admin/youtube-apps/:id', authorize(['ADMIN', 'SUPER_ADMIN']), asyn
 
     try {
         const updatedEntry = await prisma.$transaction(async (tx) => {
-            // 1. Ambil entri yang akan diubah
             const entryToUpdate = await tx.youtubeApps.findUnique({
                 where: { id: parseInt(id) },
             });
@@ -530,25 +513,20 @@ app.put('/api/admin/youtube-apps/:id', authorize(['ADMIN', 'SUPER_ADMIN']), asyn
             if (!entryToUpdate) {
                 throw new Error('Entri tidak ditemukan.');
             }
-
-            // 2. Buat catatan riwayat dari kondisi saat ini
             await tx.historyYoutubeApps.create({
                 data: {
                     urlYoutube: entryToUpdate.urlYoutube,
                     youtubeAppsId: entryToUpdate.id,
-                    creatorId: entryToUpdate.creatorId, // Catat siapa yang membuat versi ini
+                    creatorId: entryToUpdate.creatorId,
                 }
             });
-
-            // 3. Perbarui entri dengan data baru dan creator baru
             const updated = await tx.youtubeApps.update({
                 where: { id: parseInt(id) },
                 data: {
                     urlYoutube,
-                    creatorId: newCreatorId, // Catat siapa yang melakukan pembaruan
+                    creatorId: newCreatorId,
                 }
             });
-            
             return updated;
         });
 
@@ -558,8 +536,6 @@ app.put('/api/admin/youtube-apps/:id', authorize(['ADMIN', 'SUPER_ADMIN']), asyn
         res.status(500).json({ message: error.message || 'Gagal memperbarui entri Youtube Apps.' });
     }
 });
-
-
 
 app.get('/api/projects', async (req, res) => {
     const page = parseInt(req.query.page) || 1;
@@ -573,7 +549,6 @@ app.get('/api/projects', async (req, res) => {
                 include: {
                     fields: true,
                     creator: { select: { nama: true } },
-                    // submissions: { select: { status: true } }
                 },
                 skip: skip,
                 take: pageSize,
@@ -612,9 +587,7 @@ app.post('/api/projects/:projectId/submit', authorize(), upload.any(), async (re
 
             const projectFields = await tx.projectField.findMany({ where: { projectId: parseInt(projectId) } });
             const fieldMap = new Map(projectFields.map(f => [f.id.toString(), f]));
-
             const submissionValues = [];
-
             for (const key in req.body) {
                 if (fieldMap.has(key)) {
                     submissionValues.push({
@@ -624,7 +597,6 @@ app.post('/api/projects/:projectId/submit', authorize(), upload.any(), async (re
                     });
                 }
             }
-
             if (req.files && req.files.length > 0) {
                 req.files.forEach(file => {
                     if (fieldMap.has(file.fieldname)) {
@@ -640,7 +612,6 @@ app.post('/api/projects/:projectId/submit', authorize(), upload.any(), async (re
             if (submissionValues.length > 0) {
                 await tx.submissionValue.createMany({ data: submissionValues });
             }
-
             return newSubmission;
         });
         res.status(201).json({ message: 'Pengerjaan berhasil dikirim.', submission });
@@ -649,20 +620,16 @@ app.post('/api/projects/:projectId/submit', authorize(), upload.any(), async (re
         res.status(500).json({ message: 'Gagal mengirim pengerjaan.' });
     }
 });
-
-
 app.get('/api/admin/users', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
     const { status } = req.query;
     const page = parseInt(req.query.page) || 1;
     const pageSize = parseInt(req.query.pageSize) || 10;
     const skip = (page - 1) * pageSize;
-
     try {
         const whereClause = {};
         if (status && ['PENDING', 'APPROVED', 'REJECTED'].includes(status)) {
             whereClause.statusRegistrasi = status;
         }
-
         const [users, totalItems] = await prisma.$transaction([
             prisma.user.findMany({
                 where: whereClause,
@@ -673,7 +640,6 @@ app.get('/api/admin/users', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res
             }),
             prisma.user.count({ where: whereClause })
         ]);
-
         res.json({
             data: users,
             pagination: {
@@ -687,11 +653,9 @@ app.get('/api/admin/users', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res
         res.status(500).json({ message: 'Gagal mengambil data pengguna.' });
     }
 });
-
 app.put('/api/admin/users/:id', authorize(['ADMIN', 'SUPER_ADMIN']), upload.single('picture'), async (req, res) => {
     const userId = parseInt(req.params.id);
     const { nama, email, role, balance, bankName, noRekening, nomorTelepon } = req.body;
-
     try {
         const dataToUpdate = {
             nama,
@@ -701,28 +665,22 @@ app.put('/api/admin/users/:id', authorize(['ADMIN', 'SUPER_ADMIN']), upload.sing
             bankName,
             noRekening,
         };
-
         if (req.user.role === 'SUPER_ADMIN' && balance !== undefined) {
             dataToUpdate.balance = new Decimal(balance);
         }
-
         if (req.file) {
             dataToUpdate.picture = req.file.location;
         }
-
         const updatedUser = await prisma.user.update({
             where: { id: userId },
             data: dataToUpdate,
         });
-
         res.json(updatedUser);
     } catch (error) {
         console.error(`Error updating user ${userId}:`, error);
         res.status(500).json({ message: 'Gagal memperbarui data pengguna.' });
     }
 });
-
-
 app.put('/api/admin/users/:id/approve', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
     try {
         const updatedUser = await prisma.user.update({
@@ -734,7 +692,6 @@ app.put('/api/admin/users/:id/approve', authorize(['ADMIN', 'SUPER_ADMIN']), asy
         res.status(500).json({ message: 'Gagal menyetujui registrasi.' });
     }
 });
-
 app.put('/api/admin/users/:id/reject', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
     try {
         const updatedUser = await prisma.user.update({
@@ -746,16 +703,13 @@ app.put('/api/admin/users/:id/reject', authorize(['ADMIN', 'SUPER_ADMIN']), asyn
         res.status(500).json({ message: 'Gagal menolak registrasi.' });
     }
 });
-
 app.post('/api/admin/projects', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
     const { namaProyek, iconUrl, projectUrl, nilaiProyek, deskripsi, category, fields } = req.body;
     const creatorId = req.user.id;
-
     try {
         if (!namaProyek || !nilaiProyek || !fields || !Array.isArray(fields)) {
             return res.status(400).json({ message: 'Data tidak lengkap.' });
         }
-
         const newProject = await prisma.project.create({
             data: {
                 namaProyek, projectUrl, deskripsi, category,
@@ -782,7 +736,6 @@ app.post('/api/admin/projects', authorize(['ADMIN', 'SUPER_ADMIN']), async (req,
 app.put('/api/admin/projects/:id', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
     const projectId = parseInt(req.params.id);
     const { namaProyek, iconUrl, nilaiProyek, projectUrl, deskripsi, fields } = req.body;
-
     try {
         const updatedProject = await prisma.$transaction(async (tx) => {
             await tx.project.update({
