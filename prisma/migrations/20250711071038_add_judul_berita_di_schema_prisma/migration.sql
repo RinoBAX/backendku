@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE `News` ADD COLUMN `judul` VARCHAR(191) NULL;

@@ -51,6 +51,7 @@ model User {
 model Project {
   id          Int            @id @default(autoincrement())
   namaProyek  String
+  category    String?
   iconUrl     String?
   nilaiProyek Decimal        @db.Decimal(12, 2)
   projectUrl  String?

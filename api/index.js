@@ -323,7 +323,7 @@ app.put('/api/users/me/picture', authorize(), upload.single('picture'), async (r
 });
 
 
-app.get('/api/projects', authorize(), async (req, res) => {
+app.get('/api/projects', async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const pageSize = parseInt(req.query.pageSize) || 10;
     const skip = (page - 1) * pageSize;
@@ -509,7 +509,7 @@ app.put('/api/admin/users/:id/reject', authorize(['ADMIN', 'SUPER_ADMIN']), asyn
 });
 
 app.post('/api/admin/projects', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
-    const { namaProyek, iconUrl, projectUrl, nilaiProyek, deskripsi, fields } = req.body;
+    const { namaProyek, iconUrl, projectUrl, nilaiProyek, deskripsi, category, fields } = req.body;
     const creatorId = req.user.id;
 
     try {
@@ -519,7 +519,7 @@ app.post('/api/admin/projects', authorize(['ADMIN', 'SUPER_ADMIN']), async (req,
 
         const newProject = await prisma.project.create({
             data: {
-                namaProyek, projectUrl, deskripsi,
+                namaProyek, projectUrl, deskripsi, category,
                 nilaiProyek: new Decimal(nilaiProyek),
                 creatorId,
                 iconUrl: iconUrl || null,
