@@ -327,7 +327,7 @@ app.put('/api/users/me/picture', authorize(), upload.single('picture'), async (r
     }
 });
 
-app.get('/api/youtube-apps', async (req, res) => {
+app.get('/api/youtube', async (req, res) => {
     try {
         const youtubeApps = await prisma.youtubeApps.findMany({
             orderBy: {
