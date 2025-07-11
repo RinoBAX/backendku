@@ -12,34 +12,36 @@ generator client {
 // =============================================
 
 model User {
-  id               Int                @id @default(autoincrement())
-  nama             String
-  email            String             @unique
-  password         String
-  picture          String?
-  nomorTelepon     String?            @unique
-  kecamatan        String?
-  domisili         String?
-  fotoKtp          String?
-  tglLahir         DateTime?
-  bankName         BankNamenya        @default(EMPTY)
-  noRekening       String?
-  kodeReferral     String             @unique
-  uplineId         Int?
-  upline           User?              @relation("ReferralTree", fields: [uplineId], references: [id], onDelete: SetNull)
-  downlines        User[]             @relation("ReferralTree")
-  balance          Decimal            @default(0) @db.Decimal(12, 2)
-  role             Role               @default(USER)
-  statusRegistrasi RegistrationStatus @default(PENDING)
-  previlegeStatus  Boolean            @default(false)
-  projectsCreated  Project[]
-  submissions      Submission[]
-  withdrawals      Withdrawal[]
-  transactions     Transaction[]
-  tglDibuat        DateTime           @default(now())
-  tglDiperbarui    DateTime           @updatedAt
-  Level            Level[]
-  LevelHistory     LevelHistory[]
+  id                 Int                  @id @default(autoincrement())
+  nama               String
+  email              String               @unique
+  password           String
+  picture            String?
+  nomorTelepon       String?              @unique
+  kecamatan          String?
+  domisili           String?
+  fotoKtp            String?
+  tglLahir           DateTime?
+  bankName           BankNamenya          @default(EMPTY)
+  noRekening         String?
+  kodeReferral       String               @unique
+  uplineId           Int?
+  upline             User?                @relation("ReferralTree", fields: [uplineId], references: [id], onDelete: SetNull)
+  downlines          User[]               @relation("ReferralTree")
+  balance            Decimal              @default(0) @db.Decimal(12, 2)
+  role               Role                 @default(USER)
+  statusRegistrasi   RegistrationStatus   @default(PENDING)
+  previlegeStatus    Boolean              @default(false)
+  projectsCreated    Project[]
+  submissions        Submission[]
+  withdrawals        Withdrawal[]
+  transactions       Transaction[]
+  tglDibuat          DateTime             @default(now())
+  tglDiperbarui      DateTime             @updatedAt
+  Level              Level[]
+  LevelHistory       LevelHistory[]
+  YoutubeApps        YoutubeApps[]
+  HistoryYoutubeApps HistoryYoutubeApps[]
 
   @@map("users")
 }
@@ -82,19 +84,42 @@ model ProjectField {
 // =============================================
 
 model Submission {
-  id           Int               @id @default(autoincrement())
-  status       SubmissionStatus  @default(PENDING)
-  catatanAdmin String?
-  userId       Int
-  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  projectId    Int
-  project      Project           @relation(fields: [projectId], references: [id], onDelete: Restrict)
-  values       SubmissionValue[]
-  transactions Transaction[]
-  tglDibuat    DateTime          @default(now())
-  level        Level[]
+  id            Int               @id @default(autoincrement())
+  status        SubmissionStatus  @default(PENDING)
+  catatanAdmin  String?
+  userId        Int
+  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId     Int
+  project       Project           @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  values        SubmissionValue[]
+  transactions  Transaction[]
+  tglDibuat     DateTime          @default(now())
+  level         Level[]
+  YoutubeApps   YoutubeApps?      @relation(fields: [youtubeAppsId], references: [id])
+  youtubeAppsId Int?
 
   @@map("submissions")
+}
+
+model YoutubeApps {
+  id             Int                  @id @default(autoincrement())
+  urlYoutube     String
+  tglDibuat      DateTime             @default(now())
+  tglDiperbarui  DateTime             @updatedAt
+  historyYoutube HistoryYoutubeApps[]
+  Submission     Submission[]
+  creatorId      Int
+  creator        User                 @relation(fields: [creatorId], references: [id])
+}
+
+model HistoryYoutubeApps {
+  id            Int          @id @default(autoincrement())
+  urlYoutube    String
+  tglDibuat     DateTime     @default(now())
+  youtubeAppsId Int?
+  YoutubeApps   YoutubeApps? @relation(fields: [youtubeAppsId], references: [id])
+  creatorId     Int
+  creator       User         @relation(fields: [creatorId], references: [id])
 }
 
 model SubmissionValue {

@@ -327,6 +327,239 @@ app.put('/api/users/me/picture', authorize(), upload.single('picture'), async (r
     }
 });
 
+// GET semua data YoutubeApps (Publik, tanpa otentikasi)
+app.get('/api/youtube-apps', async (req, res) => {
+    try {
+        const youtubeApps = await prisma.youtubeApps.findMany({
+            orderBy: {
+                tglDibuat: 'desc'
+            },
+            include: {
+                creator: {
+                    select: {
+                        nama: true
+                    }
+                }
+            }
+        });
+        res.status(200).json(youtubeApps);
+    } catch (error) {
+        console.error("Error fetching YoutubeApps:", error);
+        res.status(500).json({ message: 'Gagal mengambil data Youtube Apps.' });
+    }
+});
+
+// GET semua riwayat YoutubeApps (Hanya Admin & Super Admin) dengan paginasi
+app.get('/api/admin/history-youtube-apps', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
+    const page = parseInt(req.query.page) || 1;
+    const pageSize = parseInt(req.query.pageSize) || 20;
+    const skip = (page - 1) * pageSize;
+
+    try {
+        const [history, totalItems] = await prisma.$transaction([
+            prisma.historyYoutubeApps.findMany({
+                include: {
+                    creator: {
+                        select: {
+                            nama: true
+                        }
+                    },
+                    YoutubeApps: {
+                        select: {
+                            urlYoutube: true
+                        }
+                    }
+                },
+                orderBy: {
+                    tglDibuat: 'desc'
+                },
+                skip: skip,
+                take: pageSize
+            }),
+            prisma.historyYoutubeApps.count()
+        ]);
+
+        res.status(200).json({
+            data: history,
+            pagination: {
+                totalItems,
+                totalPages: Math.ceil(totalItems / pageSize),
+                currentPage: page,
+                pageSize,
+            }
+        });
+    } catch (error) {
+        console.error("Error fetching YoutubeApps History:", error);
+        res.status(500).json({ message: 'Gagal mengambil riwayat Youtube Apps.' });
+    }
+});
+
+// GET semua data YoutubeApps (Publik, tanpa otentikasi)
+app.get('/api/youtube-apps', async (req, res) => {
+    try {
+        const youtubeApps = await prisma.youtubeApps.findMany({
+            orderBy: {
+                tglDibuat: 'desc'
+            },
+            include: {
+                creator: {
+                    select: {
+                        nama: true
+                    }
+                }
+            }
+        });
+        res.status(200).json(youtubeApps);
+    } catch (error) {
+        console.error("Error fetching YoutubeApps:", error);
+        res.status(500).json({ message: 'Gagal mengambil data Youtube Apps.' });
+    }
+});
+
+// GET semua riwayat YoutubeApps (Hanya Admin & Super Admin) dengan paginasi
+app.get('/api/admin/history-youtube-apps', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
+    const page = parseInt(req.query.page) || 1;
+    const pageSize = parseInt(req.query.pageSize) || 20;
+    const skip = (page - 1) * pageSize;
+
+    try {
+        const [history, totalItems] = await prisma.$transaction([
+            prisma.historyYoutubeApps.findMany({
+                include: {
+                    creator: {
+                        select: {
+                            nama: true
+                        }
+                    },
+                    YoutubeApps: {
+                        select: {
+                            urlYoutube: true
+                        }
+                    }
+                },
+                orderBy: {
+                    tglDibuat: 'desc'
+                },
+                skip: skip,
+                take: pageSize
+            }),
+            prisma.historyYoutubeApps.count()
+        ]);
+
+        res.status(200).json({
+            data: history,
+            pagination: {
+                totalItems,
+                totalPages: Math.ceil(totalItems / pageSize),
+                currentPage: page,
+                pageSize,
+            }
+        });
+    } catch (error) {
+        console.error("Error fetching YoutubeApps History:", error);
+        res.status(500).json({ message: 'Gagal mengambil riwayat Youtube Apps.' });
+    }
+});
+
+// POST untuk membuat entri YoutubeApps baru (Hanya Admin & Super Admin)
+// Logika: Memindahkan semua entri yang ada ke riwayat, lalu membuat entri baru.
+app.post('/api/admin/youtube-apps', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
+    const { urlYoutube } = req.body;
+    const creatorId = req.user.id;
+
+    if (!urlYoutube) {
+        return res.status(400).json({ message: 'URL Youtube wajib diisi.' });
+    }
+
+    try {
+        const newEntry = await prisma.$transaction(async (tx) => {
+            // 1. Ambil semua entri YoutubeApps yang ada saat ini
+            const existingEntries = await tx.youtubeApps.findMany();
+
+            // 2. Jika ada, pindahkan ke riwayat
+            if (existingEntries.length > 0) {
+                const historyData = existingEntries.map(entry => ({
+                    urlYoutube: entry.urlYoutube,
+                    youtubeAppsId: entry.id,
+                    creatorId: entry.creatorId, // Gunakan creatorId dari entri lama
+                }));
+                await tx.historyYoutubeApps.createMany({
+                    data: historyData,
+                });
+            }
+            
+            // 3. Hapus semua entri lama dari YoutubeApps
+            await tx.youtubeApps.deleteMany({});
+
+            // 4. Buat entri baru
+            const createdEntry = await tx.youtubeApps.create({
+                data: {
+                    urlYoutube,
+                    creatorId,
+                }
+            });
+
+            return createdEntry;
+        });
+
+        res.status(201).json(newEntry);
+    } catch (error) {
+        console.error("Error creating new YoutubeApps entry:", error);
+        res.status(500).json({ message: 'Gagal membuat entri Youtube Apps baru.' });
+    }
+});
+
+// PUT untuk mengedit entri YoutubeApps yang ada (Hanya Admin & Super Admin)
+// Logika: Memindahkan entri yang akan diubah ke riwayat, lalu perbarui entri tersebut.
+app.put('/api/admin/youtube-apps/:id', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
+    const { id } = req.params;
+    const { urlYoutube } = req.body;
+    const newCreatorId = req.user.id;
+
+    if (!urlYoutube) {
+        return res.status(400).json({ message: 'URL Youtube wajib diisi.' });
+    }
+
+    try {
+        const updatedEntry = await prisma.$transaction(async (tx) => {
+            // 1. Ambil entri yang akan diubah
+            const entryToUpdate = await tx.youtubeApps.findUnique({
+                where: { id: parseInt(id) },
+            });
+
+            if (!entryToUpdate) {
+                throw new Error('Entri tidak ditemukan.');
+            }
+
+            // 2. Buat catatan riwayat dari kondisi saat ini
+            await tx.historyYoutubeApps.create({
+                data: {
+                    urlYoutube: entryToUpdate.urlYoutube,
+                    youtubeAppsId: entryToUpdate.id,
+                    creatorId: entryToUpdate.creatorId, // Catat siapa yang membuat versi ini
+                }
+            });
+
+            // 3. Perbarui entri dengan data baru dan creator baru
+            const updated = await tx.youtubeApps.update({
+                where: { id: parseInt(id) },
+                data: {
+                    urlYoutube,
+                    creatorId: newCreatorId, // Catat siapa yang melakukan pembaruan
+                }
+            });
+            
+            return updated;
+        });
+
+        res.status(200).json(updatedEntry);
+    } catch (error) {
+        console.error(`Error updating YoutubeApps entry ${id}:`, error);
+        res.status(500).json({ message: error.message || 'Gagal memperbarui entri Youtube Apps.' });
+    }
+});
+
+
 
 app.get('/api/projects', async (req, res) => {
     const page = parseInt(req.query.page) || 1;
