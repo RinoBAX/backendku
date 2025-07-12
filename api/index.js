@@ -1027,6 +1027,53 @@ app.put('/api/admin/submissions/:id/reject', authorize(['ADMIN', 'SUPER_ADMIN'])
     }
 });
 
+// POST untuk user mengajukan permintaan penarikan dana
+app.post('/api/users/me/withdrawals', authorize(), async (req, res) => {
+    const userId = req.user.id;
+    const { totalWithdrawal } = req.body;
+
+    // 1. Validasi input
+    if (!totalWithdrawal || totalWithdrawal <= 0) {
+        return res.status(400).json({ message: 'Jumlah penarikan tidak valid.' });
+    }
+
+    try {
+        // 2. Ambil data pengguna untuk memeriksa saldo
+        const user = await prisma.user.findUnique({
+            where: { id: userId }
+        });
+
+        if (!user) {
+            return res.status(404).json({ message: 'User tidak ditemukan.' });
+        }
+
+        // 3. Periksa apakah saldo mencukupi
+        const requestedAmount = new Decimal(totalWithdrawal);
+        if (new Decimal(user.balance).lessThan(requestedAmount)) {
+            return res.status(400).json({ message: 'Saldo tidak mencukupi untuk melakukan penarikan.' });
+        }
+
+        // 4. Buat catatan withdrawal baru dengan status PENDING
+        const newWithdrawal = await prisma.withdrawal.create({
+            data: {
+                userId: userId,
+                totalWithdrawal: requestedAmount,
+                status: 'PENDING' // Status default, tapi lebih baik eksplisit
+            }
+        });
+
+        res.status(201).json({ 
+            message: 'Permintaan penarikan berhasil diajukan dan akan segera diproses.', 
+            withdrawal: newWithdrawal 
+        });
+
+    } catch (error) {
+        console.error(`Error saat user ${userId} mengajukan penarikan:`, error);
+        res.status(500).json({ message: 'Gagal mengajukan permintaan penarikan.' });
+    }
+});
+
+
 app.get('/api/superadmin/withdrawals', authorize(['SUPER_ADMIN']), async (req, res) => {
     const { status } = req.query;
     try {
