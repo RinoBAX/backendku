@@ -234,17 +234,6 @@ app.get('/api/users/me', authorize(), async (req, res) => {
                 bankName: true, noRekening: true,
                 upline: { select: { id: true, nama: true, email: true } },
                 transactions: { orderBy: { transactionDate: 'desc' }, take: 20 },
-                // downlines: {
-                //     skip: (downlinePage - 1) * pageSize,
-                //     take: pageSize,
-                //     select: { id: true, nama: true, email: true }
-                // },
-                // submissions: {
-                //     skip: (submissionPage - 1) * pageSize,
-                //     take: pageSize,
-                //     orderBy: { tglDibuat: 'desc' },
-                //     include: { project: { select: { namaProyek: true } } }
-                // },
                 _count: {
                     select: {
                         downlines: true,
