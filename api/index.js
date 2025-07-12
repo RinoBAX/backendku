@@ -869,16 +869,15 @@ app.get('/api/users/me/submissions', authorize(), async (req, res) => {
         const totalPages = Math.ceil(totalItems / pageSize);
 
         res.status(200).json({
-            success: true,
-            message: "Report found",
-            result: {
-                totalItems: totalItems,
-                totalPages: totalPages,
-                perPage: pageSize,
+            pagination: {
+                totalItems,
+                totalPages: Math.ceil(totalItems / pageSize),
+                perPage,
                 currentPage: page,
-                data: submissions
-            }
-        });
+                pageSize,
+            },
+            data: submissions
+        })
 
     } catch (error) {
         console.error(`Error fetching submissions for user ${userId}:`, error);
