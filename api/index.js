@@ -871,8 +871,7 @@ app.get('/api/users/me/submissions', authorize(), async (req, res) => {
         res.status(200).json({
             pagination: {
                 totalItems,
-                totalPages: Math.ceil(totalItems / pageSize),
-                perPage,
+                totalPages,
                 currentPage: page,
                 pageSize,
             },
