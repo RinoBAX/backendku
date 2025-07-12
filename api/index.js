@@ -472,7 +472,7 @@ app.post('/api/admin/youtube', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, 
                 const historyData = existingEntries.map(entry => ({
                     urlYoutube: entry.urlYoutube,
                     youtubeAppsId: entry.id,
-                    creatorId: entry.creatorId, 
+                    creatorId: entry.creatorId,
                 }));
                 await tx.historyYoutubeApps.createMany({
                     data: historyData,
@@ -543,7 +543,7 @@ app.get('/api/projects', async (req, res) => {
     const skip = (page - 1) * pageSize;
 
     try {
-        
+
         const [projects, totalItems] = await prisma.$transaction([
             prisma.project.findMany({
                 include: {
@@ -558,12 +558,10 @@ app.get('/api/projects', async (req, res) => {
         ]);
 
         res.json({
-            pagination: {
-                totalItems,
-                totalPages: Math.ceil(totalItems / pageSize),
-                currentPage: page,
-                pageSize,
-            },
+            totalItems,
+            totalPages: Math.ceil(totalItems / pageSize),
+            currentPage: page,
+            pageSize,
             data: projects
         });
     } catch (error) {
