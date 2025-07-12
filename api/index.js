@@ -205,16 +205,15 @@ app.get('/api/users/downline/:id', authorize(), async (req, res) => {
         const totalPages = Math.ceil(totalItems / pageSize);
 
         res.status(200).json({
-            success: true,
-            message: 'Downline found',
-            result: {
+            pagination: {
                 totalItems,
                 totalPages,
                 perPage: pageSize,
                 currentPage: page,
-                data: downlines,
             },
+            data: downlines
         });
+
     } catch (error) {
         console.error(`Error fetching downlines for user ${targetUserId}:`, error);
         res.status(500).json({ success: false, message: 'Failed to fetch downline data.' });
