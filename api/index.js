@@ -900,112 +900,92 @@ app.get('/api/admin/submissions/:id', authorize(['ADMIN', 'SUPER_ADMIN']), async
 });
 
 
-app.put('/api/admin/submissions/:id/approve', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
+app.put('/api/admin/submissions/:id/approve', authorize(['ADMIN']), async (req, res) => {
     const submissionId = parseInt(req.params.id);
     try {
-        const updatedSubmission = await prisma.$transaction(async (tx) => {
-            const submission = await tx.submission.findUnique({
-                where: { id: submissionId },
-                include: {
-                    project: true,
-                    user: {
-                        include: {
-                            upline: {
-                                include: {
-                                    upline: true
-                                }
-                            }
-                        }
-                    }
+        const submission = await prisma.submission.findUnique({
+            where: { id: submissionId },
+            include: {
+                project: true,
+                user: { 
+                    include: { 
+                        upline: { 
+                            include: { 
+                                upline: true 
+                            } 
+                        } 
+                    } 
                 }
-            });
+            }
+        });
 
-            if (!submission) throw new Error('Submission tidak ditemukan.');
-            if (submission.status !== 'PENDING') throw new Error('Submission ini sudah pernah diproses.');
+        if (!submission) throw new Error('Submission tidak ditemukan.');
+        if (submission.status !== 'PENDING') throw new Error('Submission ini sudah pernah diproses.');
+        
+        const operationalUsers = await prisma.user.findMany({
+            where: {
+                kodeReferral: {
+                    in: ['BAXRINO010817', 'BAXFRIANDRE01', 'BAXSULTAN0069', 'BAXWAHYURM069']
+                }
+            }
+        });
 
+        const updatedSubmission = await prisma.$transaction(async (tx) => {
             const { user: pengerja, project } = submission;
             const nilaiProyek = new Decimal(project.nilaiProyek);
+            
+            const operations = [];
 
-            await tx.user.update({
+            operations.push(tx.user.update({
                 where: { id: pengerja.id },
                 data: { balance: { increment: nilaiProyek } },
-            });
-            await tx.transaction.create({
-                data: {
-                    tipe: 'PENGERJAAN_PROYEK',
-                    jumlah: nilaiProyek,
-                    deskripsi: `Bonus pengerjaan proyek: ${project.namaProyek}`,
-                    userId: pengerja.id,
-                    submissionId: submission.id
+            }));
+            operations.push(tx.transaction.create({
+                data: { 
+                    tipe: 'PENGERJAAN_PROYEK', jumlah: nilaiProyek, 
+                    deskripsi: `Bonus pengerjaan proyek: ${project.namaProyek}`, 
+                    userId: pengerja.id, submissionId: submission.id 
                 }
-            });
+            }));
 
             const uplineL1 = pengerja.upline;
             if (uplineL1) {
                 const komisiL1 = nilaiProyek.mul(0.10);
-                await tx.user.update({ where: { id: uplineL1.id }, data: { balance: { increment: komisiL1 } } });
-                await tx.transaction.create({
-                    data: {
-                        tipe: 'KOMISI_UPLINE_1',
-                        jumlah: komisiL1,
-                        deskripsi: `Komisi dari downline: ${pengerja.nama}`,
-                        userId: uplineL1.id,
-                        submissionId: submission.id
-                    }
-                });
+                operations.push(tx.user.update({ where: { id: uplineL1.id }, data: { balance: { increment: komisiL1 } } }));
+                operations.push(tx.transaction.create({ data: { tipe: 'KOMISI_UPLINE_1', jumlah: komisiL1, deskripsi: `Komisi dari downline: ${pengerja.nama}`, userId: uplineL1.id, submissionId: submission.id } }));
 
                 const uplineL2 = uplineL1.upline;
                 if (uplineL2) {
                     const komisiL2 = nilaiProyek.mul(0.01);
-                    await tx.user.update({ where: { id: uplineL2.id }, data: { balance: { increment: komisiL2 } } });
-                    await tx.transaction.create({
-                        data: {
-                            tipe: 'KOMISI_UPLINE_2',
-                            jumlah: komisiL2,
-                            deskripsi: `Komisi dari downline level 2: ${pengerja.nama}`,
-                            userId: uplineL2.id,
-                            submissionId: submission.id
-                        }
-                    });
+                    operations.push(tx.user.update({ where: { id: uplineL2.id }, data: { balance: { increment: komisiL2 } } }));
+                    operations.push(tx.transaction.create({ data: { tipe: 'KOMISI_UPLINE_2', jumlah: komisiL2, deskripsi: `Komisi dari downline level 2: ${pengerja.nama}`, userId: uplineL2.id, submissionId: submission.id } }));
                 }
             }
 
-            const operationalBonuses = [
-                { refCode: 'BAXRINO010817', amount: 1100 },
-                { refCode: 'BAXFRIANDRE01', amount: 1000 },
-                { refCode: 'BAXSULTAN0069', amount: 400 },
-                { refCode: 'BAXWAHYURM069', amount: 400 }
-            ];
-
-            for (const bonus of operationalBonuses) {
-                const operationalUser = await tx.user.findUnique({
-                    where: { kodeReferral: bonus.refCode }
-                });
-
-                if (operationalUser) {
-                    const bonusAmount = new Decimal(bonus.amount);
-                    await tx.user.update({
-                        where: { id: operationalUser.id },
-                        data: { balance: { increment: bonusAmount } }
-                    });
-                    await tx.transaction.create({
-                        data: {
-                            tipe: 'BONUS_OPERASIONAL',
-                            jumlah: bonusAmount,
-                            deskripsi: `Bonus operasional dari persetujuan submission ID: ${submission.id}`,
-                            userId: operationalUser.id,
-                            submissionId: submission.id
-                        }
-                    });
+            const bonusMap = {
+                'BAXRINO010817': 1100,
+                'BAXFRIANDRE01': 1100,
+                'BAXSULTAN0069': 400,
+                'BAXWAHYURM069': 400
+            };
+            for (const opUser of operationalUsers) {
+                const bonusAmount = new Decimal(bonusMap[opUser.kodeReferral] || 0);
+                if (bonusAmount > 0) {
+                    operations.push(tx.user.update({ where: { id: opUser.id }, data: { balance: { increment: bonusAmount } } }));
+                    operations.push(tx.transaction.create({ data: { tipe: 'BONUS_OPERASIONAL', jumlah: bonusAmount, deskripsi: `Bonus operasional dari submission ID: ${submission.id}`, userId: opUser.id, submissionId: submission.id } }));
                 }
             }
-
-            return tx.submission.update({
+            
+            operations.push(tx.submission.update({
                 where: { id: submissionId },
                 data: { status: 'APPROVED' },
-            });
-        });
+            }));
 
+            await Promise.all(operations);
+            
+            return submission; 
+        });
+        
         res.json({ message: `Submission ID ${submissionId} berhasil disetujui.`, submission: updatedSubmission });
     } catch (error) {
         console.error(`Gagal menyetujui submission ${submissionId}:`, error);
