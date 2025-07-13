@@ -1103,10 +1103,4 @@ app.put('/api/superadmin/withdrawals/:id/approve', authorize(['SUPER_ADMIN']), a
         res.status(500).json({ message: error.message || 'Gagal menyetujui penarikan.' });
     }
 });
-/*
-const PORT = process.env.PORT || 6969;
-app.listen(PORT, () => {
-    console.log(`Server berjalan di http://localhost:${PORT}`);
-});
-*/
 module.exports = app;
