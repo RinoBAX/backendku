@@ -983,7 +983,9 @@ app.put('/api/admin/submissions/:id/approve', authorize(['ADMIN']), async (req, 
             await Promise.all(operations);
             
             return submission; 
-        });
+        }, {
+  timeout: 10000, // Menaikkan timeout menjadi 10 detik
+});
         
         res.json({ message: `Submission ID ${submissionId} berhasil disetujui.`, submission: updatedSubmission });
     } catch (error) {
