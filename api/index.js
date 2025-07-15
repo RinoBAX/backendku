@@ -1170,7 +1170,7 @@ app.post('/api/contact/admin', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, 
                     data: historyData,
                 });
             }
-            
+            // RINO GANTENG
             await tx.contactAdmin.deleteMany({});
 
             const createdContact = await tx.contactAdmin.create({
