@@ -1162,7 +1162,7 @@ app.post('/api/contact/admin', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, 
             const existingContacts = await tx.contactAdmin.findMany();
             if (existingContacts.length > 0) {
                 const historyData = existingContacts.map(contact => ({
-                    phoneNumber: contact.phoneNumber,
+                    phoneNumber: contact.phoneNumber.toString(),
                     contactAdminId: contact.id,
                     creatorId: creatorId
                 }));
@@ -1170,7 +1170,6 @@ app.post('/api/contact/admin', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, 
                     data: historyData,
                 });
             }
-            // RINO GANTENG
             await tx.contactAdmin.deleteMany({});
 
             const createdContact = await tx.contactAdmin.create({
