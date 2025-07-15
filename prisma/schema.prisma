@@ -12,38 +12,60 @@ generator client {
 // =============================================
 
 model User {
-  id                 Int                  @id @default(autoincrement())
-  nama               String
-  email              String               @unique
-  password           String
-  picture            String?
-  nomorTelepon       String?              @unique
-  kecamatan          String?
-  domisili           String?
-  fotoKtp            String?
-  tglLahir           DateTime?
-  bankName           BankNamenya          @default(EMPTY)
-  noRekening         String?
-  kodeReferral       String               @unique
-  uplineId           Int?
-  upline             User?                @relation("ReferralTree", fields: [uplineId], references: [id], onDelete: SetNull)
-  downlines          User[]               @relation("ReferralTree")
-  balance            Decimal              @default(0) @db.Decimal(12, 2)
-  role               Role                 @default(USER)
-  statusRegistrasi   RegistrationStatus   @default(PENDING)
-  previlegeStatus    Boolean              @default(false)
-  projectsCreated    Project[]
-  submissions        Submission[]
-  withdrawals        Withdrawal[]
-  transactions       Transaction[]
-  tglDibuat          DateTime             @default(now())
-  tglDiperbarui      DateTime             @updatedAt
-  Level              Level[]
-  LevelHistory       LevelHistory[]
-  YoutubeApps        YoutubeApps[]
-  HistoryYoutubeApps HistoryYoutubeApps[]
+  id                  Int                   @id @default(autoincrement())
+  nama                String
+  email               String                @unique
+  password            String
+  picture             String?
+  nomorTelepon        String?               @unique
+  kecamatan           String?
+  domisili            String?
+  fotoKtp             String?
+  tglLahir            DateTime?
+  bankName            BankNamenya           @default(EMPTY)
+  noRekening          String?
+  kodeReferral        String                @unique
+  uplineId            Int?
+  upline              User?                 @relation("ReferralTree", fields: [uplineId], references: [id], onDelete: SetNull)
+  downlines           User[]                @relation("ReferralTree")
+  balance             Decimal               @default(0) @db.Decimal(12, 2)
+  role                Role                  @default(USER)
+  statusRegistrasi    RegistrationStatus    @default(PENDING)
+  previlegeStatus     Boolean               @default(false)
+  projectsCreated     Project[]
+  submissions         Submission[]
+  withdrawals         Withdrawal[]
+  transactions        Transaction[]
+  tglDibuat           DateTime              @default(now())
+  tglDiperbarui       DateTime              @updatedAt
+  Level               Level[]
+  LevelHistory        LevelHistory[]
+  YoutubeApps         YoutubeApps[]
+  HistoryYoutubeApps  HistoryYoutubeApps[]
+  ContactAdmin        ContactAdmin[]
+  HistoryContactAdmin HistoryContactAdmin[]
 
   @@map("users")
+}
+
+model ContactAdmin {
+  id                  Int                   @id @default(autoincrement())
+  phoneNumber         Int
+  tglDibuat           DateTime              @default(now())
+  creatorId           Int
+  creator             User                  @relation(fields: [creatorId], references: [id])
+  historyContactAdmin HistoryContactAdmin[]
+}
+
+model HistoryContactAdmin {
+  id          Int  @id @default(autoincrement())
+  phoneNumber Int
+  creatorId   Int
+  creator     User @relation(fields: [creatorId], references: [id])
+  tglDibuat      DateTime      @default(now())
+  tglDiperbarui  DateTime      @updatedAt
+  contactAdminId Int?
+  ContactAdmin   ContactAdmin? @relation(fields: [contactAdminId], references: [id])
 }
 
 // =============================================

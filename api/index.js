@@ -899,7 +899,7 @@ app.get('/api/admin/submissions/:id', authorize(['ADMIN', 'SUPER_ADMIN']), async
     }
 });
 
-app.put('/api/admin/submissions/:id/approve', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
+app.put('/api/admin/submissions/:id/approve', authorize(['ADMIN']), async (req, res) => {
     const submissionId = parseInt(req.params.id);
     try {
         const submission = await prisma.submission.findUnique({
@@ -1103,4 +1103,110 @@ app.put('/api/superadmin/withdrawals/:id/approve', authorize(['SUPER_ADMIN']), a
         res.status(500).json({ message: error.message || 'Gagal menyetujui penarikan.' });
     }
 });
+
+// =============================================
+// ROUTES - CONTACT ADMIN
+// =============================================
+
+// GET nomor kontak admin saat ini (Publik, tanpa otentikasi)
+app.get('/api/contact/admin', async (req, res) => {
+    try {
+        // Seharusnya hanya ada satu entri, jadi kita ambil yang pertama
+        const contact = await prisma.contactAdmin.findFirst({
+            orderBy: {
+                tglDibuat: 'desc'
+            }
+        });
+        res.status(200).json(contact);
+    } catch (error) {
+        console.error("Error fetching contact admin:", error);
+        res.status(500).json({ message: 'Gagal mengambil data kontak.' });
+    }
+});
+
+// GET riwayat kontak admin (Hanya Admin & Super Admin)
+app.get('/api/contact/admin/history', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
+    const page = parseInt(req.query.page) || 1;
+    const pageSize = parseInt(req.query.pageSize) || 20;
+    const skip = (page - 1) * pageSize;
+
+    try {
+        const [history, totalItems] = await prisma.$transaction([
+            prisma.historyContactAdmin.findMany({
+                orderBy: {
+                    tglDibuat: 'desc'
+                },
+                skip,
+                take: pageSize
+            }),
+            prisma.historyContactAdmin.count()
+        ]);
+
+        res.status(200).json({
+            data: history,
+            pagination: {
+                totalItems,
+                totalPages: Math.ceil(totalItems / pageSize),
+                currentPage: page,
+                pageSize,
+            }
+        });
+    } catch (error) {
+        console.error("Error fetching contact admin history:", error);
+        res.status(500).json({ message: 'Gagal mengambil riwayat kontak.' });
+    }
+});
+
+// POST untuk membuat/memperbarui nomor kontak admin (Hanya Admin & Super Admin)
+app.post('/api/contact/admin', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
+    const { phoneNumber } = req.body;
+    const creatorId = req.user.id;
+
+    if (!phoneNumber) {
+        return res.status(400).json({ message: 'Nomor telepon wajib diisi.' });
+    }
+
+    try {
+        const newContact = await prisma.$transaction(async (tx) => {
+            // 1. Ambil semua entri yang ada saat ini (seharusnya hanya satu)
+            const existingContacts = await tx.contactAdmin.findMany();
+
+            // 2. Jika ada, arsipkan ke riwayat
+            if (existingContacts.length > 0) {
+                const historyData = existingContacts.map(contact => ({
+                    phoneNumber: contact.phoneNumber,
+                    contactAdminId: contact.id
+                }));
+                await tx.historyContactAdmin.createMany({
+                    data: historyData,
+                });
+            }
+            
+            // 3. Hapus semua entri lama dari ContactAdmin
+            await tx.contactAdmin.deleteMany({});
+
+            // 4. Buat entri baru
+            const createdContact = await tx.contactAdmin.create({
+                data: {
+                    phoneNumber: parseInt(phoneNumber),
+                    creatorId: creatorId,
+                }
+            });
+
+            return createdContact;
+        });
+
+        res.status(201).json(newContact);
+    } catch (error) {
+        console.error("Error creating new contact admin:", error);
+        res.status(500).json({ message: 'Gagal memperbarui kontak admin.' });
+    }
+});
+
+/*
+const PORT = process.env.PORT || 6969;
+app.listen(PORT, () => {
+    console.log(`Server berjalan di http://localhost:${PORT}`);
+});
+*/
 module.exports = app;
