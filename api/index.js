@@ -1164,7 +1164,7 @@ app.post('/api/contact/admin', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, 
                 const historyData = existingContacts.map(contact => ({
                     phoneNumber: contact.phoneNumber,
                     contactAdminId: contact.id,
-                    creatorId
+                    creatorId: creatorId
                 }));
                 await tx.historyContactAdmin.createMany({
                     data: historyData,
