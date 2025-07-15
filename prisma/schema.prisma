@@ -50,7 +50,7 @@ model User {
 
 model ContactAdmin {
   id                  Int                   @id @default(autoincrement())
-  phoneNumber         Int
+  phoneNumber         String
   tglDibuat           DateTime              @default(now())
   creatorId           Int
   creator             User                  @relation(fields: [creatorId], references: [id])
@@ -58,10 +58,10 @@ model ContactAdmin {
 }
 
 model HistoryContactAdmin {
-  id          Int  @id @default(autoincrement())
-  phoneNumber Int
-  creatorId   Int
-  creator     User @relation(fields: [creatorId], references: [id])
+  id             Int           @id @default(autoincrement())
+  phoneNumber    String
+  creatorId      Int
+  creator        User          @relation(fields: [creatorId], references: [id])
   tglDibuat      DateTime      @default(now())
   tglDiperbarui  DateTime      @updatedAt
   contactAdminId Int?

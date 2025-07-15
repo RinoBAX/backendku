@@ -1163,17 +1163,16 @@ app.post('/api/contact/admin', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, 
             if (existingContacts.length > 0) {
                 const historyData = existingContacts.map(contact => ({
                     phoneNumber: contact.phoneNumber,
-                    contactAdminId: contact.id
+                    contactAdminId: contact.id,
+                    creatorId
                 }));
                 await tx.historyContactAdmin.createMany({
                     data: historyData,
                 });
             }
             
-            // 3. Hapus semua entri lama dari ContactAdmin
             await tx.contactAdmin.deleteMany({});
 
-            // 4. Buat entri baru
             const createdContact = await tx.contactAdmin.create({
                 data: {
                     phoneNumber: parseInt(phoneNumber),
