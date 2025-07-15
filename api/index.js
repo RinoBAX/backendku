@@ -601,7 +601,8 @@ app.post('/api/projects/:projectId/submit', authorize(), upload.any(), async (re
                 await tx.submissionValue.createMany({ data: submissionValues });
             }
             return newSubmission;
-        });
+        }, { timeout: 30000 }
+    );
         res.status(201).json({ message: 'Pengerjaan berhasil dikirim.', submission });
     } catch (error) {
         console.error("Error saat submit pengerjaan:", error);
