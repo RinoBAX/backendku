@@ -1157,6 +1157,13 @@ app.post('/api/contact/admin', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, 
         return res.status(400).json({ message: 'Nomor telepon wajib diisi.' });
     }
 
+    let normalizedPhoneNumber = phoneNumber.toString().trim();
+
+    if (normalizedPhoneNumber.startsWith('+62')) {
+        normalizedPhoneNumber = normalizedPhoneNumber.substring(3);
+    } else if (normalizedPhoneNumber.startsWith('0')) {
+        normalizedPhoneNumber = normalizedPhoneNumber.substring(1);
+    }
     try {
         const newContact = await prisma.$transaction(async (tx) => {
             const existingContacts = await tx.contactAdmin.findMany();
@@ -1174,7 +1181,7 @@ app.post('/api/contact/admin', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, 
 
             const createdContact = await tx.contactAdmin.create({
                 data: {
-                    phoneNumber: phoneNumber.toString(),
+                    phoneNumber: normalizedPhoneNumber, 
                     creatorId: creatorId,
                 }
             });
@@ -1188,6 +1195,7 @@ app.post('/api/contact/admin', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, 
         res.status(500).json({ message: 'Gagal memperbarui kontak admin.' });
     }
 });
+
 
 /*
 const PORT = process.env.PORT || 6969;
