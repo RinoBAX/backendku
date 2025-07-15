@@ -1174,7 +1174,7 @@ app.post('/api/contact/admin', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, 
 
             const createdContact = await tx.contactAdmin.create({
                 data: {
-                    phoneNumber: parseInt(phoneNumber),
+                    phoneNumber: phoneNumber.toString(),
                     creatorId: creatorId,
                 }
             });
