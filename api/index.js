@@ -984,7 +984,7 @@ app.put('/api/admin/submissions/:id/approve', authorize(['ADMIN']), async (req, 
             
             return submission; 
         }, {
-  timeout: 10000, // Menaikkan timeout menjadi 10 detik
+  timeout: 10000, 
 });
         
         res.json({ message: `Submission ID ${submissionId} berhasil disetujui.`, submission: updatedSubmission });
@@ -1008,18 +1008,15 @@ app.put('/api/admin/submissions/:id/reject', authorize(['ADMIN', 'SUPER_ADMIN'])
     }
 });
 
-// POST untuk user mengajukan permintaan penarikan dana
 app.post('/api/users/me/withdrawals', authorize(), async (req, res) => {
     const userId = req.user.id;
     const { totalWithdrawal } = req.body;
 
-    // 1. Validasi input
     if (!totalWithdrawal || totalWithdrawal <= 0) {
         return res.status(400).json({ message: 'Jumlah penarikan tidak valid.' });
     }
 
     try {
-        // 2. Ambil data pengguna untuk memeriksa saldo
         const user = await prisma.user.findUnique({
             where: { id: userId }
         });
@@ -1028,18 +1025,16 @@ app.post('/api/users/me/withdrawals', authorize(), async (req, res) => {
             return res.status(404).json({ message: 'User tidak ditemukan.' });
         }
 
-        // 3. Periksa apakah saldo mencukupi
         const requestedAmount = new Decimal(totalWithdrawal);
         if (new Decimal(user.balance).lessThan(requestedAmount)) {
             return res.status(400).json({ message: 'Saldo tidak mencukupi untuk melakukan penarikan.' });
         }
 
-        // 4. Buat catatan withdrawal baru dengan status PENDING
         const newWithdrawal = await prisma.withdrawal.create({
             data: {
                 userId: userId,
                 totalWithdrawal: requestedAmount,
-                status: 'PENDING' // Status default, tapi lebih baik eksplisit
+                status: 'PENDING'
             }
         });
 
@@ -1108,10 +1103,8 @@ app.put('/api/superadmin/withdrawals/:id/approve', authorize(['SUPER_ADMIN']), a
 // ROUTES - CONTACT ADMIN
 // =============================================
 
-// GET nomor kontak admin saat ini (Publik, tanpa otentikasi)
 app.get('/api/contact/admin', async (req, res) => {
     try {
-        // Seharusnya hanya ada satu entri, jadi kita ambil yang pertama
         const contact = await prisma.contactAdmin.findFirst({
             orderBy: {
                 tglDibuat: 'desc'
@@ -1124,7 +1117,6 @@ app.get('/api/contact/admin', async (req, res) => {
     }
 });
 
-// GET riwayat kontak admin (Hanya Admin & Super Admin)
 app.get('/api/contact/admin/history', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const pageSize = parseInt(req.query.pageSize) || 20;
@@ -1157,7 +1149,6 @@ app.get('/api/contact/admin/history', authorize(['ADMIN', 'SUPER_ADMIN']), async
     }
 });
 
-// POST untuk membuat/memperbarui nomor kontak admin (Hanya Admin & Super Admin)
 app.post('/api/contact/admin', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
     const { phoneNumber } = req.body;
     const creatorId = req.user.id;
@@ -1168,10 +1159,7 @@ app.post('/api/contact/admin', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, 
 
     try {
         const newContact = await prisma.$transaction(async (tx) => {
-            // 1. Ambil semua entri yang ada saat ini (seharusnya hanya satu)
             const existingContacts = await tx.contactAdmin.findMany();
-
-            // 2. Jika ada, arsipkan ke riwayat
             if (existingContacts.length > 0) {
                 const historyData = existingContacts.map(contact => ({
                     phoneNumber: contact.phoneNumber,
