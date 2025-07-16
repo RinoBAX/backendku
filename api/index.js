@@ -569,7 +569,6 @@ app.post('/api/projects/:projectId/submit', authorize(), upload.any(), async (re
                     status: 'PENDING',
                 }
             });
-
             const projectFields = await tx.projectField.findMany({ where: { projectId: parseInt(projectId) } });
             const fieldMap = new Map(projectFields.map(f => [f.id.toString(), f]));
             const submissionValues = [];
@@ -593,7 +592,6 @@ app.post('/api/projects/:projectId/submit', authorize(), upload.any(), async (re
                     }
                 });
             }
-
             if (submissionValues.length > 0) {
                 await tx.submissionValue.createMany({ data: submissionValues });
             }
