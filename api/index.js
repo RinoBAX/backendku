@@ -1214,6 +1214,27 @@ app.post('/api/contact/admin', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, 
     }
 });
 
+app.get('/api/projects/:id', async (req, res) => {
+    const projectId = parseInt(req.params.id);
+    try {
+        const project = await prisma.project.findUnique({
+            where: { id: projectId },
+            include: {
+                fields: true, // Sertakan fields jika diperlukan di halaman detail
+            },
+        });
+
+        if (!project) {
+            return res.status(404).json({ message: 'Proyek tidak ditemukan.' });
+        }
+
+        res.json(project); // Kirim data proyek tunggal sebagai respons
+    } catch (error) {
+        console.error(`Error fetching project ${projectId}:`, error);
+        res.status(500).json({ message: 'Gagal mengambil data proyek.' });
+    }
+});
+
 /*
 const PORT = process.env.PORT || 6969;
 app.listen(PORT, () => {
