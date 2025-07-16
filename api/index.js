@@ -1197,7 +1197,6 @@ app.post('/api/contact/admin', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, 
     }
 });
 
-
 /*
 const PORT = process.env.PORT || 6969;
 app.listen(PORT, () => {
