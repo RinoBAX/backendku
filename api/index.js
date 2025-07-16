@@ -517,7 +517,6 @@ app.put('/api/admin/youtube/:id', authorize(['ADMIN', 'SUPER_ADMIN']), async (re
             });
             return updated;
         });
-
         res.status(200).json(updatedEntry);
     } catch (error) {
         console.error(`Error updating YoutubeApps entry ${id}:`, error);
@@ -531,7 +530,6 @@ app.get('/api/projects', async (req, res) => {
     const skip = (page - 1) * pageSize;
 
     try {
-        
         const [projects, totalItems] = await prisma.$transaction([
             prisma.project.findMany({
                 include: {
