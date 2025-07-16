@@ -1214,6 +1214,8 @@ app.post('/api/contact/admin', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, 
     }
 });
 
+// ================= TAMBAHAN UNTUK WEB BAXLANCER ====================
+
 app.get('/api/projects/:id', async (req, res) => {
     const projectId = parseInt(req.params.id);
     try {
@@ -1232,6 +1234,24 @@ app.get('/api/projects/:id', async (req, res) => {
     } catch (error) {
         console.error(`Error fetching project ${projectId}:`, error);
         res.status(500).json({ message: 'Gagal mengambil data proyek.' });
+    }
+});
+
+app.get('/api/news/:id', async (req, res) => {
+    const newsId = parseInt(req.params.id);
+    try {
+        const newsItem = await prisma.news.findUnique({
+            where: { id: newsId },
+        });
+
+        if (!newsItem) {
+            return res.status(404).json({ message: 'Berita tidak ditemukan.' });
+        }
+
+        res.json(newsItem);
+    } catch (error) {
+        console.error(`Error fetching news item ${newsId}:`, error);
+        res.status(500).json({ message: 'Gagal mengambil data berita.' });
     }
 });
 
