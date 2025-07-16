@@ -527,7 +527,7 @@ app.put('/api/admin/youtube/:id', authorize(['ADMIN', 'SUPER_ADMIN']), async (re
 
 app.get('/api/projects', async (req, res) => {
     const page = parseInt(req.query.page) || 1;
-    const pageSize = parseInt(req.query.pageSize) || 10;
+    const pageSize = parseInt(req.query.pageSize) || 5;
     const skip = (page - 1) * pageSize;
 
     try {
