@@ -771,19 +771,16 @@ app.delete('/api/admin/projects/:id', authorize(['ADMIN', 'SUPER_ADMIN']), async
     }
 });
 
-
 app.get('/api/admin/submissions', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
     const { status } = req.query;
     const page = parseInt(req.query.page) || 1;
     const pageSize = parseInt(req.query.pageSize) || 10;
     const skip = (page - 1) * pageSize;
-
     try {
         const whereClause = {};
         if (status && ['PENDING', 'APPROVED', 'REJECTED'].includes(status)) {
             whereClause.status = status;
         }
-
         const [submissions, totalItems] = await prisma.$transaction([
             prisma.submission.findMany({
                 where: whereClause,
@@ -797,7 +794,6 @@ app.get('/api/admin/submissions', authorize(['ADMIN', 'SUPER_ADMIN']), async (re
             }),
             prisma.submission.count({ where: whereClause })
         ]);
-
         res.json({
             data: submissions,
             pagination: {
@@ -811,7 +807,6 @@ app.get('/api/admin/submissions', authorize(['ADMIN', 'SUPER_ADMIN']), async (re
         res.status(500).json({ message: 'Gagal mengambil data submission.' });
     }
 });
-
 app.get('/api/users/me/submissions', authorize(), async (req, res) => {
     const userId = req.user.id;
     const page = parseInt(req.query.page) || 1;
