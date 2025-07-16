@@ -560,7 +560,6 @@ app.get('/api/projects', async (req, res) => {
 app.post('/api/projects/:projectId/submit', authorize(), upload.any(), async (req, res) => {
     const { projectId } = req.params;
     const userId = req.user.id;
-
     try {
         const submission = await prisma.$transaction(async (tx) => {
             const newSubmission = await tx.submission.create({
