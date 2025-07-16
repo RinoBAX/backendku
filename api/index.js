@@ -760,16 +760,43 @@ app.put('/api/admin/projects/:id', authorize(['ADMIN', 'SUPER_ADMIN']), async (r
 });
 
 app.delete('/api/admin/projects/:id', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
+    const projectIdToDelete = parseInt(req.params.id);
+
     try {
-        await prisma.project.delete({
-            where: { id: parseInt(req.params.id) }
+        await prisma.$transaction(async (tx) => {
+            const submissionsToDelete = await tx.submission.findMany({
+                where: { projectId: projectIdToDelete },
+                select: { id: true }
+            });
+            const submissionIds = submissionsToDelete.map(s => s.id);
+            if (submissionIds.length > 0) {
+                await tx.submissionValue.deleteMany({
+                    where: { submissionId: { in: submissionIds } }
+                });
+            }
+            await tx.submission.deleteMany({
+                where: { projectId: projectIdToDelete }
+            });
+            await tx.projectField.deleteMany({
+                where: { projectId: projectIdToDelete }
+            });
+            await tx.project.delete({
+                where: { id: projectIdToDelete }
+            });
         });
-        res.status(200).json({ message: 'Proyek berhasil dihapus.' });
+
+        res.status(200).json({ message: 'Proyek dan semua data terkait berhasil dihapus.' });
+
     } catch (error) {
-        console.error(`Gagal menghapus proyek: ${req.params.id}`, error);
+        console.error(`Gagal menghapus proyek: ${projectIdToDelete}`, error);
+        if (error.code) {
+             return res.status(500).json({ message: `Gagal menghapus proyek karena error database: ${error.code}` });
+        }
+        
         res.status(500).json({ message: 'Gagal menghapus proyek.' });
     }
 });
+
 
 app.get('/api/admin/submissions', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
     const { status } = req.query;
