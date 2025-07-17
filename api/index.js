@@ -917,7 +917,7 @@ app.get('/api/admin/submissions/:id', authorize(['ADMIN', 'SUPER_ADMIN']), async
     }
 });
 
-app.put('/api/admin/submissions/:id/approve', authorize(['ADMIN']), async (req, res) => {
+app.put('/api/admin/submissions/:id/approve', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
     const submissionId = parseInt(req.params.id);
     try {
         const submission = await prisma.submission.findUnique({
