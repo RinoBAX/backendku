@@ -24,7 +24,10 @@ const upload = multer({
             const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
             cb(null, 'uploads/' + file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
         }
-    })
+    }),
+    limits: {
+        fileSize: 50 * 1024 * 1024 // Batas ukuran file 50 MB (sesuaikan dengan kebutuhan)
+    }
 });
 
 module.exports = { upload };

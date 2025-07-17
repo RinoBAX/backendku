@@ -460,7 +460,7 @@ app.post('/api/admin/youtube', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, 
                 const historyData = existingEntries.map(entry => ({
                     urlYoutube: entry.urlYoutube,
                     youtubeAppsId: entry.id,
-                    creatorId: entry.creatorId, 
+                    creatorId: entry.creatorId,
                 }));
                 await tx.historyYoutubeApps.createMany({
                     data: historyData,
@@ -597,13 +597,14 @@ app.post('/api/projects/:projectId/submit', authorize(), upload.any(), async (re
             }
             return newSubmission;
         }, { timeout: 30000 }
-    );
+        );
         res.status(201).json({ message: 'Pengerjaan berhasil dikirim.', submission });
     } catch (error) {
         console.error("Error saat submit pengerjaan:", error);
         res.status(500).json({ message: 'Gagal mengirim pengerjaan.' });
     }
 });
+
 app.get('/api/admin/users', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, res) => {
     const { status } = req.query;
     const page = parseInt(req.query.page) || 1;
@@ -790,9 +791,9 @@ app.delete('/api/admin/projects/:id', authorize(['ADMIN', 'SUPER_ADMIN']), async
     } catch (error) {
         console.error(`Gagal menghapus proyek: ${projectIdToDelete}`, error);
         if (error.code) {
-             return res.status(500).json({ message: `Gagal menghapus proyek karena error database: ${error.code}` });
+            return res.status(500).json({ message: `Gagal menghapus proyek karena error database: ${error.code}` });
         }
-        
+
         res.status(500).json({ message: 'Gagal menghapus proyek.' });
     }
 });
@@ -924,21 +925,21 @@ app.put('/api/admin/submissions/:id/approve', authorize(['ADMIN', 'SUPER_ADMIN']
             where: { id: submissionId },
             include: {
                 project: true,
-                user: { 
-                    include: { 
-                        upline: { 
-                            include: { 
-                                upline: true 
-                            } 
-                        } 
-                    } 
+                user: {
+                    include: {
+                        upline: {
+                            include: {
+                                upline: true
+                            }
+                        }
+                    }
                 }
             }
         });
 
         if (!submission) throw new Error('Submission tidak ditemukan.');
         if (submission.status !== 'PENDING') throw new Error('Submission ini sudah pernah diproses.');
-        
+
         const operationalUsers = await prisma.user.findMany({
             where: {
                 kodeReferral: {
@@ -950,7 +951,7 @@ app.put('/api/admin/submissions/:id/approve', authorize(['ADMIN', 'SUPER_ADMIN']
         const updatedSubmission = await prisma.$transaction(async (tx) => {
             const { user: pengerja, project } = submission;
             const nilaiProyek = new Decimal(project.nilaiProyek);
-            
+
             const operations = [];
 
             operations.push(tx.user.update({
@@ -958,10 +959,10 @@ app.put('/api/admin/submissions/:id/approve', authorize(['ADMIN', 'SUPER_ADMIN']
                 data: { balance: { increment: nilaiProyek } },
             }));
             operations.push(tx.transaction.create({
-                data: { 
-                    tipe: 'PENGERJAAN_PROYEK', jumlah: nilaiProyek, 
-                    deskripsi: `Bonus pengerjaan proyek: ${project.namaProyek}`, 
-                    userId: pengerja.id, submissionId: submission.id 
+                data: {
+                    tipe: 'PENGERJAAN_PROYEK', jumlah: nilaiProyek,
+                    deskripsi: `Bonus pengerjaan proyek: ${project.namaProyek}`,
+                    userId: pengerja.id, submissionId: submission.id
                 }
             }));
 
@@ -992,19 +993,19 @@ app.put('/api/admin/submissions/:id/approve', authorize(['ADMIN', 'SUPER_ADMIN']
                     operations.push(tx.transaction.create({ data: { tipe: 'BONUS_OPERASIONAL', jumlah: bonusAmount, deskripsi: `Bonus operasional dari submission ID: ${submission.id}`, userId: opUser.id, submissionId: submission.id } }));
                 }
             }
-            
+
             operations.push(tx.submission.update({
                 where: { id: submissionId },
                 data: { status: 'APPROVED' },
             }));
 
             await Promise.all(operations);
-            
-            return submission; 
+
+            return submission;
         }, {
-  timeout: 10000, 
-});
-        
+            timeout: 10000,
+        });
+
         res.json({ message: `Submission ID ${submissionId} berhasil disetujui.`, submission: updatedSubmission });
     } catch (error) {
         console.error(`Gagal menyetujui submission ${submissionId}:`, error);
@@ -1056,9 +1057,9 @@ app.post('/api/users/me/withdrawals', authorize(), async (req, res) => {
             }
         });
 
-        res.status(201).json({ 
-            message: 'Permintaan penarikan berhasil diajukan dan akan segera diproses.', 
-            withdrawal: newWithdrawal 
+        res.status(201).json({
+            message: 'Permintaan penarikan berhasil diajukan dan akan segera diproses.',
+            withdrawal: newWithdrawal
         });
 
     } catch (error) {
@@ -1199,7 +1200,7 @@ app.post('/api/contact/admin', authorize(['ADMIN', 'SUPER_ADMIN']), async (req, 
 
             const createdContact = await tx.contactAdmin.create({
                 data: {
-                    phoneNumber: normalizedPhoneNumber, 
+                    phoneNumber: normalizedPhoneNumber,
                     creatorId: creatorId,
                 }
             });
