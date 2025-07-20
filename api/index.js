@@ -1322,10 +1322,10 @@ app.get('/api/news/:id', async (req, res) => {
     }
 });
 
-/*
+
 const PORT = process.env.PORT || 6969;
 app.listen(PORT, () => {
     console.log(`Server berjalan di http://localhost:${PORT}`);
 });
-*/
+
 module.exports = app;
