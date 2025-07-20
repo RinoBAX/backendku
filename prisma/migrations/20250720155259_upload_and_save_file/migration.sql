@@ -1,0 +1,9 @@
+-- CreateTable
+CREATE TABLE `SimpanFile` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `namaFile` VARCHAR(191) NULL,
+    `urlFile` VARCHAR(191) NULL,
+    `tglDibuat` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;

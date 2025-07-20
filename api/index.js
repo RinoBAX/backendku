@@ -1223,7 +1223,7 @@ app.get('/api/projects/:id', async (req, res) => {
         const project = await prisma.project.findUnique({
             where: { id: projectId },
             include: {
-                fields: true, // Sertakan fields jika diperlukan di halaman detail
+                fields: true,
             },
         });
 
@@ -1231,10 +1231,69 @@ app.get('/api/projects/:id', async (req, res) => {
             return res.status(404).json({ message: 'Proyek tidak ditemukan.' });
         }
 
-        res.json(project); // Kirim data proyek tunggal sebagai respons
+        res.json(project);
     } catch (error) {
         console.error(`Error fetching project ${projectId}:`, error);
         res.status(500).json({ message: 'Gagal mengambil data proyek.' });
+    }
+});
+
+app.get('/api/rino/storage/ke1/file', async (req, res) => {
+    const page = parseInt(req.query.page) || 1;
+    const pageSize = parseInt(req.query.pageSize) || 10;
+    const search = req.query.search || '';
+    const skip = (page - 1) * pageSize;
+
+    try {
+        const whereClause = {
+            namaFile: {
+                contains: search,
+                mode: 'insensitive',
+            },
+        };
+
+        const [files, totalItems] = await prisma.$transaction([
+            prisma.simpanFile.findMany({
+                where: whereClause,
+                orderBy: { tglDibuat: 'desc' },
+                skip: skip,
+                take: pageSize,
+            }),
+            prisma.simpanFile.count({ where: whereClause })
+        ]);
+
+        res.status(200).json({
+            data: files,
+            pagination: {
+                totalItems,
+                totalPages: Math.ceil(totalItems / pageSize),
+                currentPage: page,
+                pageSize,
+            }
+        });
+    } catch (error) {
+        console.error("Gagal mengambil data file:", error);
+        res.status(500).json({ message: 'Gagal mengambil data file.' });
+    }
+});
+
+app.post('/api/rino/storage/ke1/file', async (req, res) => {
+    const { namaFile, urlFile } = req.body;
+    if (!namaFile || !urlFile) {
+        return res.status(400).json({ message: "Field 'namaFile' dan 'urlFile' wajib diisi." });
+    }
+
+    try {
+        const newFile = await prisma.simpanFile.create({
+            data: {
+                namaFile,
+                urlFile,
+            },
+        });
+        res.status(201).json(newFile);
+    } catch (error) {
+        console.error("Gagal menyimpan data file:", error);
+        res.status(500).json({ message: 'Gagal menyimpan data file baru.' });
     }
 });
 

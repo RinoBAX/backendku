@@ -57,6 +57,13 @@ model ContactAdmin {
   historyContactAdmin HistoryContactAdmin[]
 }
 
+model SimpanFile {
+  id        Int      @id @default(autoincrement())
+  namaFile  String?
+  urlFile   String?
+  tglDibuat DateTime @default(now())
+}
+
 model HistoryContactAdmin {
   id             Int           @id @default(autoincrement())
   phoneNumber    String
