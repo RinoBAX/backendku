@@ -1277,20 +1277,27 @@ app.get('/api/rino/storage/ke1/file', async (req, res) => {
     }
 });
 
-app.post('/api/rino/storage/ke1/file', async (req, res) => {
-    const { namaFile, urlFile } = req.body;
-    if (!namaFile || !urlFile) {
-        return res.status(400).json({ message: "Field 'namaFile' dan 'urlFile' wajib diisi." });
+app.post('/api/rino/storage/ke1/file', upload.single('berkas'), async (req, res) => {
+    // Validasi: Pastikan file berhasil diunggah oleh multer
+    if (!req.file) {
+        return res.status(400).json({ message: "Tidak ada file yang diunggah." });
     }
 
     try {
+        // Setelah multer selesai, informasi file ada di `req.file`
+        // `req.body` masih bisa digunakan jika Anda mengirim field teks lain
+        const namaFile = req.file.originalname; // Nama file asli
+        const urlFile = req.file.location;      // URL file di S3 dari multer-s3
+
         const newFile = await prisma.simpanFile.create({
             data: {
-                namaFile,
-                urlFile,
+                namaFile, // Diambil dari req.file
+                urlFile,  // Diambil dari req.file.location
             },
         });
+        
         res.status(201).json(newFile);
+
     } catch (error) {
         console.error("Gagal menyimpan data file:", error);
         res.status(500).json({ message: 'Gagal menyimpan data file baru.' });
